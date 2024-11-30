@@ -123,7 +123,7 @@ void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
     int up=getHeader(&file,1);
     *found=false;
     *pos=0;
-    *blk=0;
+    *blk=1;
     bool stop=false;
     while(lo<=up && !(*found) && !stop) {
         *blk=(lo+up)/2;
@@ -144,7 +144,7 @@ void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
                 *pos=inf;
                 stop=true; //this is the case where the block is found but the rec is not 
             }
-        } else if(buf.Nb<MAX*LoadFact){
+        } else if(buf.Nb<MAX*LoadFact && strcmp(key,buf.array[buf.Nb-1].id)>0){
             *pos=buf.Nb;
             lo=*blk;
             stop=true;
@@ -156,7 +156,7 @@ void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
             }
         }
     }
-    if(!(*found)) {
+    if(!(*found) && !stop) {
         *blk=lo;
     }
     close(&file);
@@ -166,8 +166,6 @@ void insert(rec r,char* filename) {
     bool found;
     int blk,pos;
     binary_search(filename,r.id,&found,&blk,&pos);
-    printf("the block %d \n",blk);
-    // printf("the position %d\n",pos);
     if(!found) {
         TOF file;
         Tblock buf;
@@ -180,9 +178,16 @@ void insert(rec r,char* filename) {
             writeBlock(&file,1,buf);
         } else {
             bool continu=true;
+            rec x;
+            readBlock(&file,blk,&buf);
+            if(pos==buf.Nb) {
+                buf.array[buf.Nb]=r;
+                buf.Nb++;
+                writeBlock(&file,blk,buf);
+                continu=false;
+            }
             while(continu && blk<=getHeader(&file,1)) {
-                readBlock(&file,blk,&buf);
-                rec x=buf.array[buf.Nb-1];
+                x=buf.array[buf.Nb-1];
                 int k=buf.Nb-1;
                 while(k>pos) {
                     buf.array[k]=buf.array[k-1];
@@ -190,7 +195,7 @@ void insert(rec r,char* filename) {
                 }
                 buf.array[pos]=r;
                 if(buf.Nb<MAX*LoadFact) {
-                    buf.Nb++;
+                    buf.Nb=buf.Nb+1;
                     buf.array[buf.Nb-1]=x;
                     writeBlock(&file,blk,buf);
                     continu=false;
@@ -200,13 +205,17 @@ void insert(rec r,char* filename) {
                     pos=0;
                     r=x;
                 }
+                if(continu && blk<=getHeader(&file,1)) {
+                    readBlock(&file,blk,&buf);
+                }
             }
             if(blk>getHeader(&file,1)) { //same for if(continu)
+                blk=getHeader(&file,1)+1;
                 buf.array[0]=r;
                 buf.Nb=1;
                 buf.deleted=0;
-                writeBlock(&file,blk,buf);
                 setHeader(&file,1,blk);
+                writeBlock(&file,blk,buf);
             }
         }
         setHeader(&file,2,getHeader(&file,2)+1);
@@ -216,9 +225,6 @@ void insert(rec r,char* filename) {
 
 void charging_TOF(){
     FILE* F;
-    TOF File;
-    Tblock buf;
-    int count=0;
     F = fopen("TOF.txt","r");
     if (F==NULL)
     {
@@ -280,29 +286,7 @@ void charging_TOF(){
         }
         r.birth_city[i]='\0';
         r.del=false;
-        count++;
-        printf("count is %d\n",count);
         insert(r,"TOF.bin");
-        // open(&File,"TOF.bin","rb+");
-        // for (int i = 1; i <= getHeader(&File,1); i++)
-        // {
-        //     readBlock(&File,i,&buf);
-        //     printf("block %d\n",i);
-        //     for (int j = 0; j < buf.Nb; j++)
-        //     {
-        //         printf("the id is : %s\n",buf.array[j].id);
-        //     }
-        //     printf("\n\n");
-        // }
-        // close(&File);
-        if (count >100)
-        {
-            break;
-        }
-        // TOF file;
-        // open(&file,"TOF.bin","rb+");
-        // printf("%d\n",getHeader(&file,1));
-        // close(&file);
     }
     fclose(F);
 }
@@ -317,8 +301,8 @@ bool search(int key ,rec* r){
     }
     char string[100];
     bool stop;
-    fgets(&string,100,F);
-    while (fgets(&string,100,F) && !stop)
+    fgets(string,100,F);
+    while (fgets(string,100,F) && !stop)
     {
         int cpt=1;
         int index=0;

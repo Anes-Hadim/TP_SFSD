@@ -442,7 +442,7 @@ bool search(int key ,rec* r){
     return false;
 }
 
-void bulk_loading(char* filename) {
+void bulk_loading2(char* filename) {
     TOF file;
     Tblock buf;
     FILE* F;

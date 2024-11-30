@@ -214,69 +214,6 @@ void insert(rec r,char* filename) {
     }
 }
 
-void delete(rec r,char* filename) {
-    bool found;
-    int blk,pos;
-    binary_search(filename,r.id,&found,&blk,&pos);
-    if(found) {
-        TOF file;
-        Tblock buf;
-        open(&file,filename,"rb+");
-        readBlock(&file,blk,&buf);
-        buf.array[pos].del=true;
-        buf.deleted++;
-        writeBlock(&file,blk,buf);
-        if(blk==1 && buf.Nb-buf.deleted==0) {
-            setHeader(&file,1,0);
-        }
-        setHeader(&file,3,getHeader(&file,3)+1);
-        setHeader(&file,2,getHeader(&file,2)-1);
-        close(&file);
-    }
-}
-
-void bulk_loading(char* filename) {
-    TOF file;
-    Tblock buf;
-    open(&file,filename,"rb+");
-    int blk=1,pos=0;
-    int nrec;
-    rec r;
-    printf("enter the number of records to be inserted : \n");
-    scanf("%d",&nrec);
-    for(int i=0;i<nrec;i++) {
-        printf("enter the ID : \n");
-        scanf("%s",r.id);
-        printf("enter the firts name : \n");
-        scanf("%s",r.first_name);
-        printf("enter the Last name : \n");
-        scanf("%s",r.last_name);
-        printf("enter the birth date in this format ##/##/#### : \n");
-        scanf("%s",r.birth_date);
-        printf("enter the birth city : \n");
-        scanf("%s",r.birth_city);
-        r.del=false;
-        if(pos<LoadFact*MAX) {
-            buf.array[pos] = r;
-            pos++;
-        } else {
-            buf.deleted=0;
-            buf.Nb=pos;
-            writeBlock(&file,blk,buf);
-            blk++;
-            buf.array[0]=r;
-            pos=1;
-        }
-    }
-    buf.Nb=pos;
-    buf.deleted=0;
-    writeBlock(&file,blk,buf);
-    setHeader(&file,1,blk);
-    setHeader(&file,2,nrec);
-    setHeader(&file,3,0);
-    close(&file);
-}
-
 void charging_TOF(){
     FILE* F;
     TOF File;
@@ -449,15 +386,15 @@ void bulk_loading(char* filename) {
     int key=10000;
     open(&file,filename,"rb+");
     int blk=1,pos=0;
-    int nrec;
+    int nrec=0;
     rec r;
-    scanf("%d",&nrec);
-    while(key<2000) {
+    while(key<20000) {
             if (search(key,&r))
             {
                 r.del=false;
                 if(pos<LoadFact*MAX) {
                     buf.array[pos] = r;
+                    nrec++;
                     pos++;
                 } else {
                     buf.deleted=0;
@@ -465,6 +402,7 @@ void bulk_loading(char* filename) {
                     writeBlock(&file,blk,buf);
                     blk++;
                     buf.array[0]=r;
+                    nrec++;
                     pos=1;
                 }
             }
@@ -479,91 +417,26 @@ void bulk_loading(char* filename) {
     close(&file);
 }
 
-// void reorganisation(char* filename) {
-//     TOF file1,file2;
-//     Tblock buf1,buf2;
-//     open(&file1,filename,"rb+");
-//     open(&file2,"NewTempReoFile.bin","wb+");
-//     int N1=getHeader(&file1,1);
-//     int nbrec=0;
-//     int blk2=1,pos2=0;
-//     int blk1=1,pos1=0;
-//     while(blk1<=N1) {
-//         readBlock(&file1,blk1,&buf1);
-//         while(pos1<buf1.Nb) {
-//             if(!buf1.array[pos1].del) {
-//                 nbrec++;
-//                 if(pos2<LoadFact*MAX) {
-//                     buf2.array[pos2]=buf1.array[pos1];
-//                     pos2++;
-//                 } else {
-//                     buf2.Nb=pos2;
-//                     buf2.del=0;
-//                     buf2.notdel=buf2.Nb;
-//                     writeBlock(&file2,blk2,buf2);
-//                     blk2++;
-//                     buf2.array[0]=buf1.array[pos1];
-//                     pos2=1;
-//                 }
-//             }
-//             pos1++;
-//         }
-//         blk1++;
-//     }
-//     buf2.Nb=pos2;
-//     buf2.deleted=0;
-//     buf2.notdel=buf2.Nb;
-//     writeBlock(&file2,blk2,buf2);
-//     setHeader(&file2,1,blk2);
-//     setHeader(&file2,2,nbrec);
-//     setHeader(&file2,3,0);
-//     close(&file1);
-//     close(&file2);
-//     remove(filename); // actually it gets archived
-//     rename("NewTempReoFile.bin",filename);
-// }
-
-
-// void reorganization_exo3(char* filename) {
-//     TOF file;
-//     Tblock buf1,buf2;
-//     open(&file,filename,"rb+");
-//     int N=getHeader(&file,1);
-//     int blk=1,pos=0;
-//     int newblk=1,newpos=0;
-//     int nbrec=0;
-//     readBlock(&file,N,&buf1);
-//     if(N!=0 || getHeader(&file,3)!=0) {
-//         while(blk<=N) {
-//             readBlock(&file,blk,&buf1);
-//             while(pos<buf1.Nb) {
-//                 if(!buf1.array[pos].del) {
-//                     nbrec++;
-//                     if(newpos<MAX) {
-//                         buf2.array[newpos]=buf1.array[pos];
-//                         newpos++;
-//                     } else {
-//                         buf2.Nb=MAX;
-//                         writeBlock(&file,newblk,buf2);
-//                         newblk++;
-//                         buf2.array[0]=buf1.array[pos];
-//                         newpos=1;
-//                     }
-//                 }
-//                 pos++;
-//             }
-//             blk++;
-//         }
-//         buf2.Nb=newpos;
-//         buf2.del=0;
-//         buf2.notdel=buf2.Nb;
-//         writeBlock(&file,newblk,buf2);
-//         setHeader(&file,1,newblk);
-//         setHeader(&file,2,nbrec);
-//         setHeader(&file,3,0);
-//     }
-//     close(&file);
-// }
+void delete(rec r,char* filename) {
+    bool found;
+    int blk,pos;
+    binary_search(filename,r.id,&found,&blk,&pos);
+    if(found) {
+        TOF file;
+        Tblock buf;
+        open(&file,filename,"rb+");
+        readBlock(&file,blk,&buf);
+        buf.array[pos].del=true;
+        buf.deleted++;
+        writeBlock(&file,blk,buf);
+        if(blk==1 && buf.Nb-buf.deleted==0) {
+            setHeader(&file,1,0);
+        }
+        setHeader(&file,3,getHeader(&file,3)+1);
+        setHeader(&file,2,getHeader(&file,2)-1);
+        close(&file);
+    }
+}
 
 int main(){
     createTOF("TOF.bin");

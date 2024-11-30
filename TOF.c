@@ -370,6 +370,115 @@ void charging_TOF(){
     fclose(F);
 }
 
+bool search(int key ,rec* r){
+    FILE* F;
+    F = fopen("TOF.txt","r");
+    if (F==NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    char string[100];
+    bool stop;
+    fgets(&string,100,F);
+    while (fgets(&string,100,F) && !stop)
+    {
+        int cpt=1;
+        int index=0;
+        int i=0;
+        while(string[index]!='\0') {
+            if (string[index]=='\t') {
+                switch (cpt)
+                {
+                case 1:
+                    r->id[i]='\0';
+                    break;
+                case 2:
+                    r->first_name[i]='\0';
+                    break;
+                case 3:
+                    r->last_name[i]='\0';
+                    break;
+                case 4:
+                    r->birth_date[i]='\0';
+                    break;
+                case 5:
+                    r->birth_city[i]='\0';
+                    break;
+                }
+                i=0;
+                cpt++;
+            } else {
+                switch (cpt)
+                {
+                case 1:
+                    r->id[i]=string[index];
+                    break;
+                case 2:
+                    r->first_name[i]=string[index];
+                    break;
+                case 3:
+                    r->last_name[i]=string[index];
+                    break;
+                case 4:
+                    r->birth_date[i]=string[index];
+                    break;
+                case 5:
+                    r->birth_city[i]=string[index];
+                    break;
+                }
+                i++;
+            }
+            index++;
+        }
+        r->birth_city[i]='\0';
+        if (atoi(r->id)==key)
+        {
+            fclose(F);
+            return true;
+        }
+    }
+    fclose(F);
+    return false;
+}
+
+void bulk_loading(char* filename) {
+    TOF file;
+    Tblock buf;
+    FILE* F;
+    int key=10000;
+    open(&file,filename,"rb+");
+    int blk=1,pos=0;
+    int nrec;
+    rec r;
+    scanf("%d",&nrec);
+    while(key<2000) {
+            if (search(key,&r))
+            {
+                r.del=false;
+                if(pos<LoadFact*MAX) {
+                    buf.array[pos] = r;
+                    pos++;
+                } else {
+                    buf.deleted=0;
+                    buf.Nb=pos;
+                    writeBlock(&file,blk,buf);
+                    blk++;
+                    buf.array[0]=r;
+                    pos=1;
+                }
+            }
+            key++;
+    }
+    buf.Nb=pos;
+    buf.deleted=0;
+    writeBlock(&file,blk,buf);
+    setHeader(&file,1,blk);
+    setHeader(&file,2,nrec);
+    setHeader(&file,3,0);
+    close(&file);
+}
+
 // void reorganisation(char* filename) {
 //     TOF file1,file2;
 //     Tblock buf1,buf2;

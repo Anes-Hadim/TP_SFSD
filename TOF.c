@@ -15,59 +15,59 @@ typedef struct rec {
     char birth_city[20];
 }rec;
 
-typedef struct Tblock { 
+typedef struct TOFblock { 
     rec array[MAX];
     int Nb;
     int deleted; //number of deleted records inside the block
-}Tblock;
+}TOFblock;
 
-typedef struct Header {
+typedef struct TOFHeader {
     int BlkNb;
     int RecNb; //total undeleted records in the file
     int DelRecNb; //total deleted records in the file
-}Header;
+}TOFHeader;
 
 typedef struct TOF {
-    Header header;
+    TOFHeader header;
     FILE* f;
 }TOF;
 
-void open(TOF* file,char* filename,char* mode);
+void openTOF(TOF* file,char* filename,char* mode);
 
-void close(TOF* file);
+void closeTOF(TOF* file);
 
-void setHeader(TOF* file,int field,int val);
+void setHeaderTOF(TOF* file,int field,int val);
 
-int getHeader(TOF* file,int field);
+int getHeaderTOF(TOF* file,int field);
 
-void readBlock(TOF* file,int Bnb,Tblock* buffer);
+void readBlockTOF(TOF* file,int Bnb,TOFblock* buffer);
 
-void writeBlock(TOF* file,int Bnb,Tblock buffer);
+void writeBlockTOF(TOF* file,int Bnb,TOFblock buffer);
 
 void createTOF(char* filename);
 
 
-void open(TOF* file,char* filename,char* mode) {
+void openTOF(TOF* file,char* filename,char* mode) {
     file->f=fopen(filename,mode);
     if(file->f==NULL) {
         perror("error openning the file");
         exit(1);
     }
-    int n=fread(&(file->header),sizeof(Header),1,file->f);
+    int n=fread(&(file->header),sizeof(TOFHeader),1,file->f);
     if(n!=1) {
-        setHeader(file,1,0);
-        setHeader(file,2,0);
-        setHeader(file,3,0);
+        setHeaderTOF(file,1,0);
+        setHeaderTOF(file,2,0);
+        setHeaderTOF(file,3,0);
     }
 }
 
-void close(TOF* file) {
+void closeTOF(TOF* file) {
     fseek(file->f,0,SEEK_SET);
-    fwrite(&(file->header),sizeof(Header),1,file->f);
+    fwrite(&(file->header),sizeof(TOFHeader),1,file->f);
     fclose(file->f);
 }
 
-void setHeader(TOF* file,int field,int val) {
+void setHeaderTOF(TOF* file,int field,int val) {
     if(file->f!=NULL) {
         if(field==1) {
             file->header.BlkNb=val;
@@ -79,7 +79,7 @@ void setHeader(TOF* file,int field,int val) {
     }
 }
 
-int getHeader(TOF* file,int field) {
+int getHeaderTOF(TOF* file,int field) {
     if(file->f!=NULL) {
         if(field==1) {
             return file->header.BlkNb;
@@ -92,42 +92,40 @@ int getHeader(TOF* file,int field) {
     return -1;
 }
 
-void readBlock(TOF* file,int Bnb,Tblock* buffer) {
-    if(Bnb<=getHeader(file,1)) {
-        fseek(file->f,(Bnb-1)*sizeof(Tblock)+sizeof(Header),SEEK_SET);
-        fread(buffer,sizeof(Tblock),1,file->f);
+void readBlockTOF(TOF* file,int Bnb,TOFblock* buffer) {
+    if(Bnb<=getHeaderTOF(file,1)) {
+        fseek(file->f,(Bnb-1)*sizeof(TOFblock)+sizeof(TOFHeader),SEEK_SET);
+        fread(buffer,sizeof(TOFblock),1,file->f);
     }
 }
 
-void writeBlock(TOF* file,int Bnb,Tblock buffer) {
-    if(Bnb<=getHeader(file,1)) {
-        fseek(file->f,(Bnb-1)*sizeof(Tblock)+sizeof(Header),SEEK_SET);
-        fwrite(&buffer,sizeof(Tblock),1,file->f);
-    }
+void writeBlockTOF(TOF* file,int Bnb,TOFblock buffer) {
+    fseek(file->f,(Bnb-1)*sizeof(TOFblock)+sizeof(TOFHeader),SEEK_SET);
+    fwrite(&buffer,sizeof(TOFblock),1,file->f);
 }
 
 void createTOF(char* filename) {
     TOF file;
-    open(&file,filename,"wb+");
-    setHeader(&file,1,0);
-    setHeader(&file,2,0);
-    setHeader(&file,3,0);
-    close(&file);
+    openTOF(&file,filename,"wb+");
+    setHeaderTOF(&file,1,0);
+    setHeaderTOF(&file,2,0);
+    setHeaderTOF(&file,3,0);
+    closeTOF(&file);
 }
 
 void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
     TOF file;
-    Tblock buf;
-    open(&file,filename,"rb+");
+    TOFblock buf;
+    openTOF(&file,filename,"rb+");
     int lo=1;
-    int up=getHeader(&file,1);
+    int up=getHeaderTOF(&file,1);
     *found=false;
     *pos=0;
-    *blk=0;
+    *blk=1;
     bool stop=false;
     while(lo<=up && !(*found) && !stop) {
         *blk=(lo+up)/2;
-        readBlock(&file,*blk,&buf);
+        readBlockTOF(&file,*blk,&buf);
         if(strcmp(key,buf.array[0].id)>=0 && strcmp(key,buf.array[buf.Nb-1].id)<=0) {
             int inf=0, sup=buf.Nb-1;
             while(inf<=sup && !(*found)) {
@@ -144,7 +142,7 @@ void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
                 *pos=inf;
                 stop=true; //this is the case where the block is found but the rec is not 
             }
-        } else if(buf.Nb<MAX*LoadFact){
+        } else if(buf.Nb<MAX*LoadFact  && strcmp(key,buf.array[*pos].id)>0){
             *pos=buf.Nb;
             lo=*blk;
             stop=true;
@@ -156,33 +154,38 @@ void binary_search(char* filename,char* key,bool* found,int* blk,int* pos) {
             }
         }
     }
-    if(!(*found)) {
+    if(!(*found) && !stop) {
         *blk=lo;
     }
-    close(&file);
+    closeTOF(&file);
 }
 
-void insert(rec r,char* filename) {
+void insertTOF(rec r,char* filename) {
     bool found;
     int blk,pos;
     binary_search(filename,r.id,&found,&blk,&pos);
-    printf("the block %d \n",blk);
-    // printf("the position %d\n",pos);
     if(!found) {
         TOF file;
-        Tblock buf;
-        open(&file,filename,"rb+");
-        if(getHeader(&file,1)==0) {
+        TOFblock buf;
+        openTOF(&file,filename,"rb+");
+        if(getHeaderTOF(&file,1)==0) {
             buf.array[0]=r;
             buf.Nb=1;
             buf.deleted=0;
-            setHeader(&file,1,1);
-            writeBlock(&file,1,buf);
+            setHeaderTOF(&file,1,1);
+            writeBlockTOF(&file,1,buf);
         } else {
             bool continu=true;
-            while(continu && blk<=getHeader(&file,1)) {
-                readBlock(&file,blk,&buf);
-                rec x=buf.array[buf.Nb-1];
+            rec x;
+            readBlockTOF(&file,blk,&buf);
+            if(pos==buf.Nb) {
+                buf.array[buf.Nb]=r;
+                buf.Nb++;
+                writeBlockTOF(&file,blk,buf);
+                continu=false;
+            }
+            while(continu && blk<=getHeaderTOF(&file,1)) {
+                x=buf.array[buf.Nb-1];
                 int k=buf.Nb-1;
                 while(k>pos) {
                     buf.array[k]=buf.array[k-1];
@@ -192,97 +195,34 @@ void insert(rec r,char* filename) {
                 if(buf.Nb<MAX*LoadFact) {
                     buf.Nb++;
                     buf.array[buf.Nb-1]=x;
-                    writeBlock(&file,blk,buf);
+                    writeBlockTOF(&file,blk,buf);
                     continu=false;
                 } else {
-                    writeBlock(&file,blk,buf);
+                    writeBlockTOF(&file,blk,buf);
                     blk++;
                     pos=0;
                     r=x;
                 }
+                if(continu && blk<=getHeaderTOF(&file,1)) {
+                    readBlockTOF(&file,blk,&buf);
+                }
             }
-            if(blk>getHeader(&file,1)) { //same for if(continu)
+            if(blk>getHeaderTOF(&file,1)) { //same for if(continu)
                 buf.array[0]=r;
                 buf.Nb=1;
                 buf.deleted=0;
-                writeBlock(&file,blk,buf);
-                setHeader(&file,1,blk);
+                writeBlockTOF(&file,blk,buf);
+                setHeaderTOF(&file,1,blk);
             }
         }
-        setHeader(&file,2,getHeader(&file,2)+1);
-        close(&file);
+        setHeaderTOF(&file,2,getHeaderTOF(&file,2)+1);
+        closeTOF(&file);
     }
 }
 
-void delete(rec r,char* filename) {
-    bool found;
-    int blk,pos;
-    binary_search(filename,r.id,&found,&blk,&pos);
-    if(found) {
-        TOF file;
-        Tblock buf;
-        open(&file,filename,"rb+");
-        readBlock(&file,blk,&buf);
-        buf.array[pos].del=true;
-        buf.deleted++;
-        writeBlock(&file,blk,buf);
-        if(blk==1 && buf.Nb-buf.deleted==0) {
-            setHeader(&file,1,0);
-        }
-        setHeader(&file,3,getHeader(&file,3)+1);
-        setHeader(&file,2,getHeader(&file,2)-1);
-        close(&file);
-    }
-}
-
-void bulk_loading(char* filename) {
-    TOF file;
-    Tblock buf;
-    open(&file,filename,"rb+");
-    int blk=1,pos=0;
-    int nrec;
-    rec r;
-    printf("enter the number of records to be inserted : \n");
-    scanf("%d",&nrec);
-    for(int i=0;i<nrec;i++) {
-        printf("enter the ID : \n");
-        scanf("%s",r.id);
-        printf("enter the firts name : \n");
-        scanf("%s",r.first_name);
-        printf("enter the Last name : \n");
-        scanf("%s",r.last_name);
-        printf("enter the birth date in this format ##/##/#### : \n");
-        scanf("%s",r.birth_date);
-        printf("enter the birth city : \n");
-        scanf("%s",r.birth_city);
-        r.del=false;
-        if(pos<LoadFact*MAX) {
-            buf.array[pos] = r;
-            pos++;
-        } else {
-            buf.deleted=0;
-            buf.Nb=pos;
-            writeBlock(&file,blk,buf);
-            blk++;
-            buf.array[0]=r;
-            pos=1;
-        }
-    }
-    buf.Nb=pos;
-    buf.deleted=0;
-    writeBlock(&file,blk,buf);
-    setHeader(&file,1,blk);
-    setHeader(&file,2,nrec);
-    setHeader(&file,3,0);
-    close(&file);
-}
-
-void charging_TOF(){
+void loading_TOF(){
     FILE* F;
-    TOF File;
-    Tblock buf;
-    int count=0;
-    F = fopen("TOF.txt","r");
+    F = fopen("students_data_1a.csv","r");
     if (F==NULL)
     {
         perror("opening file");
@@ -297,7 +237,7 @@ void charging_TOF(){
         int index=0;
         int i=0;
         while(string[index]!='\0') {
-            if (string[index]=='\t') {
+            if (string[index]==',') {
                 switch (cpt)
                 {
                 case 1:
@@ -343,223 +283,400 @@ void charging_TOF(){
         }
         r.birth_city[i]='\0';
         r.del=false;
-        count++;
-        printf("count is %d\n",count);
-        insert(r,"TOF.bin");
-        // open(&File,"TOF.bin","rb+");
-        // for (int i = 1; i <= getHeader(&File,1); i++)
-        // {
-        //     readBlock(&File,i,&buf);
-        //     printf("block %d\n",i);
-        //     for (int j = 0; j < buf.Nb; j++)
-        //     {
-        //         printf("the id is : %s\n",buf.array[j].id);
-        //     }
-        //     printf("\n\n");
-        // }
-        // close(&File);
-        if (count >100)
-        {
-            break;
-        }
-        // TOF file;
-        // open(&file,"TOF.bin","rb+");
-        // printf("%d\n",getHeader(&file,1));
-        // close(&file);
+        insertTOF(r,"TOF.bin");
     }
     fclose(F);
+}
+
+void deleteTOF(rec r,char* filename) {
+    bool found;
+    int blk,pos;
+    binary_search(filename,r.id,&found,&blk,&pos);
+    if(found) {
+        TOF file;
+        TOFblock buf;
+        openTOF(&file,filename,"rb+");
+        readBlockTOF(&file,blk,&buf);
+        buf.array[pos].del=true;
+        buf.deleted++;
+        writeBlockTOF(&file,blk,buf);
+        if(blk==1 && buf.Nb-buf.deleted==0) {
+            setHeaderTOF(&file,1,0);
+        }
+        setHeaderTOF(&file,3,getHeaderTOF(&file,3)+1);
+        setHeaderTOF(&file,2,getHeaderTOF(&file,2)-1);
+        closeTOF(&file);
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+#define B 500
+#define RecSep '#'
+#define FieldSep '@'
+
+
+typedef struct TOVSblock { 
+    char array[B];
+}TOVSblock;
+
+typedef struct TOVSHeader {
+    int BlkNb;
+    int RecNb; //total undeleted records in the file
+    int DelRecNb; //total deleted records in the file
+    int pos; //NB is max for all the block exept the last one which will be same as pos
+}TOVSHeader;
+
+typedef struct TOVS {
+    TOVSHeader header;
+    FILE* f;
+}TOVS;
+
+void openTOVS(TOVS* file,char* filename,char* mode);
+
+void closeTOVS(TOVS* file);
+
+void setHeaderTOVS(TOVS* file,int field,int val);
+
+int getHeaderTOVS(TOVS* file,int field);
+
+void readBlockTOVS(TOVS* file,int Bnb,TOVSblock* buffer);
+
+void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer);
+
+void openTOVS(TOVS* file,char* filename,char* mode) {
+    file->f=fopen(filename,mode);
+    if(file->f==NULL) {
+        perror("error openning the file");
+        exit(1);
+    }
+    int n=fread(&(file->header),sizeof(TOVSHeader),1,file->f);
+    if(n!=1) {
+        setHeaderTOVS(file,1,0);
+        setHeaderTOVS(file,2,0);
+        setHeaderTOVS(file,3,0);
+        setHeaderTOVS(file,4,0);
+    }
+}
+
+void closeTOVS(TOVS* file) {
+    fseek(file->f,0,SEEK_SET);
+    fwrite(&(file->header),sizeof(TOVSHeader),1,file->f);
+    fclose(file->f);
+}
+
+void setHeaderTOVS(TOVS* file,int field,int val) {
+    if(file->f!=NULL) {
+        switch (field)
+        {
+        case 1:
+            file->header.BlkNb=val;
+            break;
+        case 2:
+            file->header.RecNb=val;
+            break;
+        case 3:
+            file->header.DelRecNb=val;
+            break;
+        case 4:
+            file->header.pos=val;
+            break;
+        
+        default:
+            printf("Error field does not exist\n");
+            break;
+        }
+    }
+}
+
+int getHeaderTOVS(TOVS* file,int field) {
+    if(file->f!=NULL) {
+        switch (field)
+        {
+        case 1:
+            return file->header.BlkNb;
+            break;
+        case 2:
+            return file->header.RecNb;
+            break;
+        case 3:
+            return file->header.DelRecNb;
+            break;
+        case 4:
+            return file->header.pos;
+            break;
+        
+        default:
+            printf("Error field does not exist\n");
+            return -1;
+            break;
+        }
+    }
+    return -1;
+}
+
+void readBlockTOVS(TOVS* file,int Bnb,TOVSblock* buffer) {
+    if(Bnb<=getHeaderTOVS(file,1)) {
+        fseek(file->f,(Bnb-1)*sizeof(TOVSblock)+sizeof(TOVSHeader),SEEK_SET);
+        fread(buffer,sizeof(TOVSblock),1,file->f);
+    }
+}
+
+void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer) {
+    fseek(file->f,(Bnb-1)*sizeof(TOVSblock)+sizeof(TOVSHeader),SEEK_SET);
+    fwrite(&buffer,sizeof(TOVSblock),1,file->f);
+}
+
+void extract_string(TOVS* file,TOVSblock* buf,int* blk,int* pos,char* val,char* del) {
+    int k=0;
+    do {
+        val[k]=buf->array[*pos];
+        (*pos)++;
+        k++;
+        if(*pos>=MAX) {
+            (*blk)++;
+            readBlockTOVS(file,*blk,buf);
+            *pos=0;
+        }
+    } while(buf->array[*pos]!=FieldSep);
+    val[k]='\0';
+    (*pos)++;
+    if(*pos>=MAX) {
+        (*blk)++;
+        readBlockTOVS(file,*blk,buf);
+        *pos=0;
+    }
+    *del = buf->array[*pos];
+}
+
+void searchTOVS(char* filename,char* key,bool* found,int* blk,int* pos) {
+    *found=false;
+    *pos=0;
+    *blk=1;
+    int prevPos=0;
+    int prevBlk=1;
+    TOVS file;
+    openTOVS(&file,filename,"rb+");
+    TOVSblock buf;
+    char val[15];
+    char del;
+    bool stop=false;
+    readBlockTOVS(&file,*blk,&buf);
+    int count=0;
+    int nbrec=getHeaderTOVS(&file,2)+getHeaderTOVS(&file,3);
+    while(count<nbrec && !(*found) && !stop) {
+        if(count!=0 && strcmp(val,key)>0) {
+            stop=true; //here pos is the new rec of the second biggest rec to key
+            *pos=prevPos; //so pos will point at the begining or the first largest res
+            *blk=prevBlk; //it is exactly where we should begin the insertion
+        } else {
+            prevPos=*pos;
+            prevBlk=*blk;
+            extract_string(&file,&buf,blk,pos,val,&del);
+            if(strcmp(val,key)==0 && del=='f') {
+                *found=true; //will stop pos at the del field
+            } else {
+                do {
+                    (*pos)++;
+                    if(*pos>=MAX) {
+                        (*blk)++;
+                        readBlockTOVS(&file,*blk,&buf);
+                        *pos=0;
+                    }
+                }while(buf.array[*pos]!=RecSep);
+                (*pos)++;
+                if(*pos>=MAX) {
+                    (*blk)++;
+                    readBlockTOVS(&file,*blk,&buf);
+                    *pos=0;
+                }
+            } //will stop pos at the first char of the new rec
+        }
+        count++; //because of count we will never need to test if we are in the last block and pos > NB
+    }
+    closeTOVS(&file);
+}
+
+void insertTOVS(char* filename,char* rec) {
+    bool found;
+    int blk,pos;
+    char key[15];
+    int i=0;
+    do {
+        key[i]=rec[i];
+        i++;
+    } while(rec[i]!=FieldSep);
+    key[i]='\0';
+    searchTOVS(filename,key,&found,&blk,&pos);
+    if(!found) {
+        TOVS file;
+        TOVSblock buf;
+        openTOVS(&file,filename,"rb+");
+        char temp;
+        i=0;
+        readBlockTOVS(&file,blk,&buf);
+        int endBlk=getHeaderTOVS(&file,1);
+        int endPos=getHeaderTOVS(&file,4);
+        while(endBlk!=blk || endPos!=pos) {
+            temp=buf.array[pos];
+            buf.array[pos]=rec[i];
+            rec[i]=temp;
+            i++;
+            pos++;
+            if(pos>=MAX) {
+                pos=0;
+                writeBlockTOVS(&file,blk,buf);
+                blk++;
+                readBlockTOVS(&file,blk,&buf);
+            }
+            if(i>=strlen(rec)) {
+                i=0;
+            }
+        }
+        while(i<strlen(rec)) {
+            if(pos>=MAX) {
+                pos=0;
+                writeBlockTOVS(&file,blk,buf);
+                blk++;
+                setHeaderTOVS(&file,1,blk);
+            }
+            buf.array[pos]=rec[i];
+            pos++;
+            i++;
+        }
+        writeBlockTOVS(&file,blk,buf);
+        setHeaderTOVS(&file,2,getHeaderTOVS(&file,2)+1);
+        setHeaderTOVS(&file,4,pos);
+        closeTOVS(&file);
+    }
+}
+
+void deleteTOVS(char* filename,char* key) {
+    bool found;
+    int blk,pos;
+    searchTOVS(filename,key,&found,&blk,&pos);
+    if(found) {
+        TOVS file;
+        TOVSblock buf;
+        openTOVS(&file,filename,"rb+");
+        readBlockTOVS(&file,blk,&buf);
+        buf.array[pos]='v';
+        setHeaderTOVS(&file,2,getHeaderTOVS(&file,2)-1);
+        setHeaderTOVS(&file,3,getHeaderTOVS(&file,3)+1);
+        writeBlockTOVS(&file,blk,buf);
+        closeTOVS(&file);
+    }
 }
 
 typedef struct tovs_info{
         char id[6];
-        char year[1];
+        char deleted;
+        char year;
         char info[];
 }tovs_info;
 
-bool search(char key[6] ,tovs_info* r){
-    FILE* F;
-    F = fopen("TOF.txt","r");
-    if (F==NULL)
-    {
-        perror("opening file");
-        exit(1);
-    }
-    char string[100];
-    bool stop;
-    fgets(&string,100,F);
-    while (fgets(&string,100,F) && !stop)
-    {
-        int cpt=1;
-        int index=0;
-        int i=0;
-        while(string[index]!='\0') {
-            if (string[index]=='\t') {
-                switch (cpt)
-                {
-                case 1:
-                    r->id[i]='\0';
-                    break;
-                case 2:
-                    r->year[i]='\0';
-                    break;
-                case 3:
-                    r->info[i]='\0';
-                    break;
-                }
-                i=0;
-                cpt++;
-            } else {
-                switch (cpt)
-                {
-                case 1:
-                    r->id[i]=string[index];
-                    break;
-                case 2:
-                    r->year[i]=string[index];
-                    break;
-                case 3:
-                    r->info[i]=string[index];
-                    break;
-                }
-                i++;
-            }
-            index++;
-        }
-        r->info[i]='\0';
-        if (strcmp(key,r->id)==0)
-        {
-            fclose(F);
-            return true;
-        }
-    }
-    fclose(F);
-    return false;
-}
-
-void bulk_loading2(char* filename) {
-    TOF file;
-    Tblock buf;
-    FILE* F;
-    int key=10000;
-    open(&file,filename,"rb+");
-    int blk=1,pos=0;
-    int nrec;
-    rec r;
-    while(key<2000) {
-            if (search(key,&r))
-            {
-                r.del=false;
-                if(pos<LoadFact*MAX) {
-                    buf.array[pos] = r;
-                    pos++;
-                } else {
-                    buf.deleted=0;
-                    buf.Nb=pos;
-                    writeBlock(&file,blk,buf);
-                    blk++;
-                    buf.array[0]=r;
-                    pos=1;
-                }
-            }
-            key++;
-    }
-    buf.Nb=pos;
-    buf.deleted=0;
-    writeBlock(&file,blk,buf);
-    setHeader(&file,1,blk);
-    setHeader(&file,2,nrec);
-    setHeader(&file,3,0);
-    close(&file);
-}
-
-// void reorganisation(char* filename) {
-//     TOF file1,file2;
-//     Tblock buf1,buf2;
-//     open(&file1,filename,"rb+");
-//     open(&file2,"NewTempReoFile.bin","wb+");
-//     int N1=getHeader(&file1,1);
-//     int nbrec=0;
-//     int blk2=1,pos2=0;
-//     int blk1=1,pos1=0;
-//     while(blk1<=N1) {
-//         readBlock(&file1,blk1,&buf1);
-//         while(pos1<buf1.Nb) {
-//             if(!buf1.array[pos1].del) {
-//                 nbrec++;
-//                 if(pos2<LoadFact*MAX) {
-//                     buf2.array[pos2]=buf1.array[pos1];
-//                     pos2++;
-//                 } else {
-//                     buf2.Nb=pos2;
-//                     buf2.del=0;
-//                     buf2.notdel=buf2.Nb;
-//                     writeBlock(&file2,blk2,buf2);
-//                     blk2++;
-//                     buf2.array[0]=buf1.array[pos1];
-//                     pos2=1;
-//                 }
-//             }
-//             pos1++;
-//         }
-//         blk1++;
+// bool search(char key[6] ,tovs_info* r){
+//     FILE* F;
+//     F = fopen("Tstudents)data_2a.csv","r");
+//     if (F==NULL)
+//     {
+//         perror("opening file");
+//         exit(1);
 //     }
-//     buf2.Nb=pos2;
-//     buf2.deleted=0;
-//     buf2.notdel=buf2.Nb;
-//     writeBlock(&file2,blk2,buf2);
-//     setHeader(&file2,1,blk2);
-//     setHeader(&file2,2,nbrec);
-//     setHeader(&file2,3,0);
-//     close(&file1);
-//     close(&file2);
-//     remove(filename); // actually it gets archived
-//     rename("NewTempReoFile.bin",filename);
+//     char string[100];
+//     bool stop;
+//     fgets(string,100,F);
+//     while (fgets(string,100,F) && !stop)
+//     {
+//         int cpt=1;
+//         int index=0;
+//         int i=0;
+//         while(string[index]!='\0') {
+//             if (string[index]==',') {
+//                 switch (cpt)
+//                 {
+//                 case 1:
+//                     r->id[i]='\0';
+//                     break;
+//                 case 2:
+//                     r->year[i]='\0';
+//                     break;
+//                 case 3:
+//                     r->info[i]='\0';
+//                     break;
+//                 }
+//                 i=0;
+//                 cpt++;
+//             } else {
+//                 switch (cpt)
+//                 {
+//                 case 1:
+//                     r->id[i]=string[index];
+//                     break;
+//                 case 2:
+//                     r->year[i]=string[index];
+//                     break;
+//                 case 3:
+//                     r->info[i]=string[index];
+//                     break;
+//                 }
+//                 i++;
+//             }
+//             index++;
+//         }
+//         r->info[i]='\0';
+//         if (strcmp(key,r->id)==0)
+//         {
+//             fclose(F);
+//             return true;
+//         }
+//     }
+//     fclose(F);
+//     return false;
 // }
 
-
-// void reorganization_exo3(char* filename) {
+// void bulk_loading(char* filename) {
 //     TOF file;
-//     Tblock buf1,buf2;
+//     Tblock buf;
+//     FILE* F;
+//     int key=10000;
 //     open(&file,filename,"rb+");
-//     int N=getHeader(&file,1);
 //     int blk=1,pos=0;
-//     int newblk=1,newpos=0;
-//     int nbrec=0;
-//     readBlock(&file,N,&buf1);
-//     if(N!=0 || getHeader(&file,3)!=0) {
-//         while(blk<=N) {
-//             readBlock(&file,blk,&buf1);
-//             while(pos<buf1.Nb) {
-//                 if(!buf1.array[pos].del) {
-//                     nbrec++;
-//                     if(newpos<MAX) {
-//                         buf2.array[newpos]=buf1.array[pos];
-//                         newpos++;
-//                     } else {
-//                         buf2.Nb=MAX;
-//                         writeBlock(&file,newblk,buf2);
-//                         newblk++;
-//                         buf2.array[0]=buf1.array[pos];
-//                         newpos=1;
-//                     }
+//     int nrec;
+//     rec r;
+//     while(key<2000) {
+//             if (search(key,&r))
+//             {
+//                 r.del=false;
+//                 if(pos<LoadFact*MAX) {
+//                     buf.array[pos] = r;
+//                     pos++;
+//                 } else {
+//                     buf.deleted=0;
+//                     buf.Nb=pos;
+//                     writeBlock(&file,blk,buf);
+//                     blk++;
+//                     buf.array[0]=r;
+//                     pos=1;
 //                 }
-//                 pos++;
 //             }
-//             blk++;
-//         }
-//         buf2.Nb=newpos;
-//         buf2.del=0;
-//         buf2.notdel=buf2.Nb;
-//         writeBlock(&file,newblk,buf2);
-//         setHeader(&file,1,newblk);
-//         setHeader(&file,2,nbrec);
-//         setHeader(&file,3,0);
+//             key++;
 //     }
+//     buf.Nb=pos;
+//     buf.deleted=0;
+//     writeBlock(&file,blk,buf);
+//     setHeader(&file,1,blk);
+//     setHeader(&file,2,nrec);
+//     setHeader(&file,3,0);
 //     close(&file);
 // }
 
 int main(){
     createTOF("TOF.bin");
-    charging_TOF();
+    loading_TOF();
     return 0;
 }

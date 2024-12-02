@@ -2,7 +2,6 @@
 #include<string.h>
 #include<stdio.h>
 #include<stdlib.h>
-#include<unistd.h>
 
 
 #define MAX 100
@@ -36,7 +35,7 @@ typedef struct TOF {
 
 void open(TOF* file,char* filename,char* mode);
 
-// void close(TOF* file);
+void close(TOF* file);
 
 void setHeader(TOF* file,int field,int val);
 
@@ -63,11 +62,11 @@ void open(TOF* file,char* filename,char* mode) {
     }
 }
 
-// void close(TOF* file) {
-//     fseek(file->f,0,SEEK_SET);
-//     fwrite(&(file->header),sizeof(Header),1,file->f);
-//     fclose(file->f);
-// }
+void close(TOF* file) {
+    fseek(file->f,0,SEEK_SET);
+    fwrite(&(file->header),sizeof(Header),1,file->f);
+    fclose(file->f);
+}
 
 void setHeader(TOF* file,int field,int val) {
     if(file->f!=NULL) {
@@ -102,10 +101,8 @@ void readBlock(TOF* file,int Bnb,Tblock* buffer) {
 }
 
 void writeBlock(TOF* file,int Bnb,Tblock buffer) {
-    if(Bnb<=getHeader(file,1)) {
-        fseek(file->f,(Bnb-1)*sizeof(Tblock)+sizeof(Header),SEEK_SET);
-        fwrite(&buffer,sizeof(Tblock),1,file->f);
-    }
+    fseek(file->f,(Bnb-1)*sizeof(Tblock)+sizeof(Header),SEEK_SET);
+    fwrite(&buffer,sizeof(Tblock),1,file->f);
 }
 
 int main(){
@@ -124,9 +121,8 @@ int main(){
             printf("the id is : %s\n",buf.array[j].id);
         }
         printf("\n\n");
-        sleep(500);
     }
     
-    fclose(File.f);
+    close(&File);
     return 0;
 }

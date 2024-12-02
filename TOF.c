@@ -370,7 +370,13 @@ void charging_TOF(){
     fclose(F);
 }
 
-bool search(int key ,rec* r){
+typedef struct tovs_info{
+        char id[6];
+        char year[1];
+        char info[];
+}tovs_info;
+
+bool search(char key[6] ,tovs_info* r){
     FILE* F;
     F = fopen("TOF.txt","r");
     if (F==NULL)
@@ -394,16 +400,10 @@ bool search(int key ,rec* r){
                     r->id[i]='\0';
                     break;
                 case 2:
-                    r->first_name[i]='\0';
+                    r->year[i]='\0';
                     break;
                 case 3:
-                    r->last_name[i]='\0';
-                    break;
-                case 4:
-                    r->birth_date[i]='\0';
-                    break;
-                case 5:
-                    r->birth_city[i]='\0';
+                    r->info[i]='\0';
                     break;
                 }
                 i=0;
@@ -415,24 +415,18 @@ bool search(int key ,rec* r){
                     r->id[i]=string[index];
                     break;
                 case 2:
-                    r->first_name[i]=string[index];
+                    r->year[i]=string[index];
                     break;
                 case 3:
-                    r->last_name[i]=string[index];
-                    break;
-                case 4:
-                    r->birth_date[i]=string[index];
-                    break;
-                case 5:
-                    r->birth_city[i]=string[index];
+                    r->info[i]=string[index];
                     break;
                 }
                 i++;
             }
             index++;
         }
-        r->birth_city[i]='\0';
-        if (atoi(r->id)==key)
+        r->info[i]='\0';
+        if (strcmp(key,r->id)==0)
         {
             fclose(F);
             return true;

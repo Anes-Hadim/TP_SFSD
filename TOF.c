@@ -574,70 +574,228 @@ void deleteTOVS(char* filename,char* key) {
 
 typedef struct tovs_info{
         char id[6];
-        char deleted;
-        char year;
+        char year[1];
         char info[];
 }tovs_info;
 
-// bool search(char key[6] ,tovs_info* r){
-//     FILE* F;
-//     F = fopen("Tstudents)data_2a.csv","r");
-//     if (F==NULL)
-//     {
-//         perror("opening file");
-//         exit(1);
-//     }
-//     char string[100];
-//     bool stop;
-//     fgets(string,100,F);
-//     while (fgets(string,100,F) && !stop)
-//     {
-//         int cpt=1;
-//         int index=0;
-//         int i=0;
-//         while(string[index]!='\0') {
-//             if (string[index]==',') {
-//                 switch (cpt)
-//                 {
-//                 case 1:
-//                     r->id[i]='\0';
-//                     break;
-//                 case 2:
-//                     r->year[i]='\0';
-//                     break;
-//                 case 3:
-//                     r->info[i]='\0';
-//                     break;
-//                 }
-//                 i=0;
-//                 cpt++;
-//             } else {
-//                 switch (cpt)
-//                 {
-//                 case 1:
-//                     r->id[i]=string[index];
-//                     break;
-//                 case 2:
-//                     r->year[i]=string[index];
-//                     break;
-//                 case 3:
-//                     r->info[i]=string[index];
-//                     break;
-//                 }
-//                 i++;
-//             }
-//             index++;
-//         }
-//         r->info[i]='\0';
-//         if (strcmp(key,r->id)==0)
-//         {
-//             fclose(F);
-//             return true;
-//         }
-//     }
-//     fclose(F);
-//     return false;
-// }
+bool search(char key[6] ,tovs_info* r){
+    FILE* F;
+    F = fopen("Tstudents)data_2a.csv","r");
+    if (F==NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    char string[100];
+    bool stop;
+    int count=1;
+    fgets(string,100,F);
+    while (fgets(string,100,F) && !stop)
+    {
+        int cpt=1;
+        int index=0;
+        int i=0;
+        while(string[index]!='\0') {
+            if (string[index]==',') {
+                count++;
+                switch (cpt)
+                {
+                case 1:
+                    r->id[i]='\0';
+                    break;
+                case 2:
+                    r->year[i]='\0';
+                    break;
+                case 3:
+                    r->info[i]='\0';
+                    break;
+                }
+                if (count<3)
+                {
+                    i=0;
+                    cpt++;
+                }
+            } else {
+                switch (cpt)
+                {
+                case 1:
+                    r->id[i]=string[index];
+                    break;
+                case 2:
+                    r->year[i]=string[index];
+                    break;
+                case 3:
+                    r->info[i]=string[index];
+                    break;
+                }
+                i++;
+            }
+            index++;
+        }
+        r->info[i]='\0';
+        if (strcmp(key,r->id)==0)
+        {
+            fclose(F);
+            return true;
+        }
+        count=0;
+    }
+    fclose(F);
+    return false;
+}
+void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
+    if (index==501)
+    {
+        writeBlockTOVS(&tovs_f,*bnb,buffer2);
+        *bnb++;
+        *index=0;
+    }
+    else{return;}
+}
+
+
+void loading_TOVS(){
+    TOF tof_f;
+    TOVS tovs_f;
+    openTOF(&tof_f,"TOF.bin","rb+");
+    openTOVS(&tovs_f,"TOVS.bin","rb+");
+    int Nblk=getHeaderTOF(&tof_f,1),i=0;
+    TOFblock buffer1;
+    TOVSblock buffer2;
+    int cpt=1;
+    int k=0;
+    int index=0;
+    int bnb=0;
+    tovs_info info;
+    while (i<=Nblk)
+    {
+        readBlockTOF(&tof_f,i,&buffer1);
+        for (int j = 0; j < buffer1.Nb; j++)
+        {
+            cpt=1;
+            while (cpt<=5)
+            {
+                switch (cpt)
+                {
+                case 1:
+                    while (buffer1.array[j].id[k]!='\0')
+                    {
+                        buffer2.array[index]=buffer1.array[j].id[k];
+                        k++;
+                        index++;
+                        next_block(tovs_f,&bnb,&index,buffer2);
+                    }
+                    k=0;
+                    buffer2.array[index]=FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    cpt++;
+                    break;
+                case 2:
+                    while (buffer1.array[j].first_name[k]!='\0')
+                    {
+                        buffer2.array[index]=buffer1.array[j].first_name[k];
+                        k++;
+                        index++;
+                        next_block(tovs_f,&bnb,&index,buffer2);
+                    }
+                    k=0;
+                    buffer2.array[index]=FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    cpt++;
+                    break;
+                case 3:
+                    while (buffer1.array[j].last_name[k]!='\0')
+                    {
+                        buffer2.array[index]=buffer1.array[j].last_name[k];
+                        k++;
+                        index++;
+                        next_block(tovs_f,&bnb,&index,buffer2);
+                    }
+                    k=0;
+                    buffer2.array[index]=FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    cpt++;
+                    break;
+                case 4:
+                    while (buffer1.array[j].birth_date[k]!='\0')
+                    {
+                        buffer2.array[index]=buffer1.array[j].birth_date[k];
+                        k++;
+                        index++;
+                        next_block(tovs_f,&bnb,&index,buffer2);
+                    }
+                    k=0;
+                    buffer2.array[index]=FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    cpt++;
+                    break;
+                case 5:
+                    while (buffer1.array[j].birth_city[k]!='\0')
+                    {
+                        buffer2.array[index]=buffer1.array[j].birth_city[k];
+                        k++;
+                        index++;
+                        next_block(tovs_f,&bnb,&index,buffer2);
+                    }
+                    k=0;
+                    buffer2.array[index]=RecSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    cpt++;
+                    break;
+                default:
+                    break;
+                }
+            }
+            if (search(buffer1.array[j].id,&info))
+                {
+                    cpt=1;
+                    k=0;
+                    while (cpt<=2)
+                    {
+                        switch (cpt)
+                        {
+                        case 1:
+                            while (info.year[k]!='\0')
+                            {
+                                buffer2.array[index]=info.year[k];
+                                k++;
+                                index++;
+                                next_block(tovs_f,&bnb,&index,buffer2);
+                            }
+                            k=0;
+                            buffer2.array[index]=FieldSep;
+                            index++;
+                            next_block(tovs_f,&bnb,&index,buffer2);
+                            break;
+                        case 2:
+                        while (info.info[k]!='\0')
+                            {
+                                buffer2.array[index]=info.info[k];
+                                k++;
+                                index++;
+                                next_block(tovs_f,&bnb,&index,buffer2);
+                                cpt++;
+                            }
+                            k=0;
+                            buffer2.array[index]=RecSep;
+                            index++;
+                            next_block(tovs_f,&bnb,&index,buffer2);
+                            cpt++;
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                    
+                }
+        }
+    }
+}
 
 // void bulk_loading(char* filename) {
 //     TOF file;

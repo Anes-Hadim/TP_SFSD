@@ -451,7 +451,6 @@ void bulk_loading2(char* filename) {
     int blk=1,pos=0;
     int nrec;
     rec r;
-    scanf("%d",&nrec);
     while(key<2000) {
             if (search(key,&r))
             {

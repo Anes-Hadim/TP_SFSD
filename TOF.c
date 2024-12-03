@@ -431,6 +431,16 @@ void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer) {
     fwrite(&buffer,sizeof(TOVSblock),1,file->f);
 }
 
+void createTOVS(char *filename) {
+    TOVS file;
+    openTOVS(&file,filename,"wb+");
+    setHeaderTOVS(&file,1,0);
+    setHeaderTOVS(&file,2,0);
+    setHeaderTOVS(&file,3,0);
+    setHeaderTOVS(&file,4,0);
+    closeTOVS(&file);
+}
+
 void extract_string(TOVS* file,TOVSblock* buf,int* blk,int* pos,char* val,char* del) {
     int k=0;
     do {
@@ -580,7 +590,7 @@ typedef struct tovs_info{
 
 bool search(char key[6] ,tovs_info* r){
     FILE* F;
-    F = fopen("Tstudents)data_2a.csv","r");
+    F = fopen("students_data_2a.csv","r");
     if (F==NULL)
     {
         perror("opening file");
@@ -647,7 +657,7 @@ void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
     if (*index==501)
     {
         writeBlockTOVS(&tovs_f,*bnb,buffer2);
-        *bnb++;
+        (*bnb)++;
         *index=0;
     }
     else{return;}
@@ -742,7 +752,7 @@ void loading_TOVS(){
                         next_block(tovs_f,&bnb,&index,buffer2);
                     }
                     k=0;
-                    buffer2.array[index]=RecSep;
+                    buffer2.array[index]=FieldSep;
                     index++;
                     next_block(tovs_f,&bnb,&index,buffer2);
                     cpt++;
@@ -782,15 +792,25 @@ void loading_TOVS(){
                                 next_block(tovs_f,&bnb,&index,buffer2);
                             }
                             k=0;
-                            buffer2.array[index]=RecSep;
-                            index++;
-                            next_block(tovs_f,&bnb,&index,buffer2);
                             cpt++;
                             break;
                         default:
                             break;
                         }
                     }
+                    buffer2.array[index]=RecSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                } else {
+                    buffer2.array[index] = FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    buffer2.array[index] = FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    buffer2.array[index] = RecSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
                 }
         }
         i++;
@@ -837,7 +857,9 @@ void loading_TOVS(){
 // }
 
 int main(){
-    createTOF("TOF.bin");
-    loading_TOF();
+    // createTOF("TOF.bin");
+    // loading_TOF();
+    createTOVS("TOVS.bin");
+    loading_TOVS();
     return 0;
 }

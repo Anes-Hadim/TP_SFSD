@@ -861,5 +861,9 @@ int main(){
     // loading_TOF();
     createTOVS("TOVS.bin");
     loading_TOVS();
+    TOVS tovs_f;
+    openTOVS(&tovs_f,"TOVS.bin","rb+");
+    printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
+    closeTOVS(&tovs_f);
     return 0;
 }

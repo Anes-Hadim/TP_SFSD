@@ -644,7 +644,7 @@ bool search(char key[6] ,tovs_info* r){
     return false;
 }
 void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
-    if (index==501)
+    if (*index==501)
     {
         writeBlockTOVS(&tovs_f,*bnb,buffer2);
         *bnb++;
@@ -771,6 +771,7 @@ void loading_TOVS(){
                             buffer2.array[index]=FieldSep;
                             index++;
                             next_block(tovs_f,&bnb,&index,buffer2);
+                            cpt++;
                             break;
                         case 2:
                         while (info.info[k]!='\0')
@@ -779,7 +780,6 @@ void loading_TOVS(){
                                 k++;
                                 index++;
                                 next_block(tovs_f,&bnb,&index,buffer2);
-                                cpt++;
                             }
                             k=0;
                             buffer2.array[index]=RecSep;
@@ -791,10 +791,13 @@ void loading_TOVS(){
                             break;
                         }
                     }
-                    
                 }
         }
+        i++;
     }
+    setHeaderTOVS(&tovs_f,1,bnb);
+    closeTOF(&tof_f);
+    closeTOVS(&tovs_f);
 }
 
 // void bulk_loading(char* filename) {

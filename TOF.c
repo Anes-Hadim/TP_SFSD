@@ -248,7 +248,7 @@ void loading_TOF(){
         int cpt=1;
         int index=0;
         int i=0;
-        while(string[index]!='\0') {
+        while(string[index]!='\n') {
             if (string[index]==',') {
                 switch (cpt)
                 {
@@ -345,7 +345,7 @@ void loading_index(){          // sparse index
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-#define B 500
+#define B 1000
 #define RecSep '#'
 #define FieldSep '@'
 
@@ -626,17 +626,19 @@ bool search(char key[6] ,tovs_info* r){
         perror("opening file");
         exit(1);
     }
-    char string[100];
+    char string[200];
     int count=1;
-    fgets(string,100,F);
-    while (fgets(string,100,F))
+    fgets(string,200,F);
+    while (fgets(string,200,F))
     {
         int cpt=1;
         int index=0;
         int i=0;
-        while(string[index]!='\0') {
+        while(string[index]!='\n') {
             if (string[index]==',') {
                 count++;
+            }
+            if (string[index]==',' && count<3) {
                 switch (cpt)
                 {
                 case 1:
@@ -649,11 +651,8 @@ bool search(char key[6] ,tovs_info* r){
                     r->info[i]='\0';
                     break;
                 }
-                if (count<3)
-                {
-                    i=0;
-                    cpt++;
-                }
+                i=0;
+                cpt++;
             } else {
                 switch (cpt)
                 {
@@ -682,29 +681,36 @@ bool search(char key[6] ,tovs_info* r){
     fclose(F);
     return false;
 }
+
+
 void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
-    if (*index==501)
+    if (*index==B)
     {
         writeBlockTOVS(&tovs_f,*bnb,buffer2);
         (*bnb)++;
         *index=0;
     }
-    else{return;}
+    else
+    {
+        return;
+    }
 }
 
 
 void loading_TOVS(){
+    int mycpt=0;
     TOF tof_f;
     TOVS tovs_f;
     openTOF(&tof_f,"TOF.bin","rb+");
     openTOVS(&tovs_f,"TOVS.bin","rb+");
-    int Nblk=getHeaderTOF(&tof_f,1),i=0;
+    int Nblk=getHeaderTOF(&tof_f,1),i=1;
     TOFblock buffer1;
     TOVSblock buffer2;
     int cpt=1;
     int k=0;
     int index=0;
     int bnb=0;
+    int recnb=0;
     tovs_info info;
     while (i<=Nblk)
     {
@@ -721,22 +727,28 @@ void loading_TOVS(){
                     {
                         buffer2.array[index]=buffer1.array[j].id[k];
                         k++;
-                        printf("%c",buffer2.array[index]);
+                        // printf("%c",buffer2.array[index]);
                         index++;
                         next_block(tovs_f,&bnb,&index,buffer2);
                     }
                     k=0;
                     buffer2.array[index]=FieldSep;
                     index++;
-                    printf("\n");
                     next_block(tovs_f,&bnb,&index,buffer2);
+                    buffer2.array[index]='f';
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    buffer2.array[index]=FieldSep;
+                    index++;
+                    next_block(tovs_f,&bnb,&index,buffer2);
+                    // printf("\n");
                     cpt++;
                     break;
                 case 2:
                     while (buffer1.array[j].first_name[k]!='\0')
                     {
                         buffer2.array[index]=buffer1.array[j].first_name[k];
-                        printf("%c",buffer2.array[index]);
+                        // printf("%c",buffer2.array[index]);
                         k++;
                         index++;
                         next_block(tovs_f,&bnb,&index,buffer2);
@@ -744,7 +756,7 @@ void loading_TOVS(){
                     k=0;
                     buffer2.array[index]=FieldSep;
                     index++;
-                    printf("\n");
+                    // printf("\n");
                     next_block(tovs_f,&bnb,&index,buffer2);
                     cpt++;
                     break;
@@ -753,14 +765,14 @@ void loading_TOVS(){
                     {
                         buffer2.array[index]=buffer1.array[j].last_name[k];
                         k++;
-                        printf("%c",buffer2.array[index]);
+                        // printf("%c",buffer2.array[index]);
                         index++;
                         next_block(tovs_f,&bnb,&index,buffer2);
                     }
                     k=0;
                     buffer2.array[index]=FieldSep;
                     index++;
-                    printf("\n");
+                    // printf("\n");
                     next_block(tovs_f,&bnb,&index,buffer2);
                     cpt++;
                     break;
@@ -769,14 +781,14 @@ void loading_TOVS(){
                     {
                         buffer2.array[index]=buffer1.array[j].birth_date[k];
                         k++;
-                        printf("%c",buffer2.array[index]);
+                        // printf("%c",buffer2.array[index]);
                         index++;
                         next_block(tovs_f,&bnb,&index,buffer2);
                     }
                     k=0;
                     buffer2.array[index]=FieldSep;
                     index++;
-                    printf("\n");
+                    // printf("\n");
                     next_block(tovs_f,&bnb,&index,buffer2);
                     cpt++;
                     break;
@@ -785,14 +797,14 @@ void loading_TOVS(){
                     {
                         buffer2.array[index]=buffer1.array[j].birth_city[k];
                         k++;
-                        printf("%c",buffer2.array[index]);
+                        // printf("%c",buffer2.array[index]);
                         index++;
                         next_block(tovs_f,&bnb,&index,buffer2);
                     }
                     k=0;
                     buffer2.array[index]=FieldSep;
                     index++;
-                    printf("\n");
+                    // printf("\n");
                     next_block(tovs_f,&bnb,&index,buffer2);
                     cpt++;
                     break;
@@ -802,6 +814,8 @@ void loading_TOVS(){
             }
             if (search(buffer1.array[j].id,&info))
                 {
+                    mycpt++;
+                    // printf("%d\n",mycpt);
                     cpt=1;
                     k=0;
                     while (cpt<=2)
@@ -813,14 +827,14 @@ void loading_TOVS(){
                             {
                                 buffer2.array[index]=info.year[k];
                                 k++;
-                                printf("%c",buffer2.array[index]);
+                                // printf("%c",buffer2.array[index]);
                                 index++;
                                 next_block(tovs_f,&bnb,&index,buffer2);
                             }
                             k=0;
                             buffer2.array[index]=FieldSep;
                             index++;
-                            printf("\n");
+                            // printf("\n");
                             next_block(tovs_f,&bnb,&index,buffer2);
                             cpt++;
                             break;
@@ -829,22 +843,24 @@ void loading_TOVS(){
                             {
                                 buffer2.array[index]=info.info[k];
                                 k++;
-                                printf("%c",buffer2.array[index]);
+                                // printf("%c",buffer2.array[index]);
                                 index++;
                                 next_block(tovs_f,&bnb,&index,buffer2);
                             }
                             k=0;
                             cpt++;
-                            printf("\n");
+                            // printf("\n");
                             break;
                         default:
                             break;
                         }
                     }
                     buffer2.array[index]=RecSep;
+                    recnb++;
                     index++;
                     next_block(tovs_f,&bnb,&index,buffer2);
                 } else {
+                    printf("it happened\n");
                     buffer2.array[index] = FieldSep;
                     index++;
                     next_block(tovs_f,&bnb,&index,buffer2);
@@ -852,52 +868,23 @@ void loading_TOVS(){
                     index++;
                     next_block(tovs_f,&bnb,&index,buffer2);
                     buffer2.array[index] = RecSep;
+                    recnb++;
                     index++;
                     next_block(tovs_f,&bnb,&index,buffer2);
                 }
         }
         i++;
     }
+    if (index!=0) {
+        writeBlockTOVS(&tovs_f,bnb,buffer2);
+    }
     setHeaderTOVS(&tovs_f,1,bnb);
+    setHeaderTOVS(&tovs_f,2,recnb);
+    setHeaderTOVS(&tovs_f,4,index);
     closeTOF(&tof_f);
     closeTOVS(&tovs_f);
 }
 
-// void bulk_loading(char* filename) {
-//     TOF file;
-//     Tblock buf;
-//     FILE* F;
-//     int key=10000;
-//     open(&file,filename,"rb+");
-//     int blk=1,pos=0;
-//     int nrec;
-//     rec r;
-//     while(key<2000) {
-//             if (search(key,&r))
-//             {
-//                 r.del=false;
-//                 if(pos<LoadFact*MAX) {
-//                     buf.array[pos] = r;
-//                     pos++;
-//                 } else {
-//                     buf.deleted=0;
-//                     buf.Nb=pos;
-//                     writeBlock(&file,blk,buf);
-//                     blk++;
-//                     buf.array[0]=r;
-//                     pos=1;
-//                 }
-//             }
-//             key++;
-//     }
-//     buf.Nb=pos;
-//     buf.deleted=0;
-//     writeBlock(&file,blk,buf);
-//     setHeader(&file,1,blk);
-//     setHeader(&file,2,nrec);
-//     setHeader(&file,3,0);
-//     close(&file);
-// }
 
 int main(){
     // createTOF("TOF.bin");
@@ -907,6 +894,7 @@ int main(){
     TOVS tovs_f;
     openTOVS(&tovs_f,"TOVS.bin","rb+");
     printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
+    printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
     closeTOVS(&tovs_f);
     return 0;
 }

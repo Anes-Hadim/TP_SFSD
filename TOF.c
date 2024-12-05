@@ -27,9 +27,21 @@ typedef struct TOFHeader {
     int DelRecNb; //total deleted records in the file
 }TOFHeader;
 
+typedef struct index_array{
+    char id[6];
+    int pos;
+    int blk;
+}index_array;
+
+typedef struct index{
+    int size;
+    index_array array[200];
+}index;
+
 typedef struct TOF {
     TOFHeader header;
     FILE* f;
+    index index;
 }TOF;
 
 void openTOF(TOF* file,char* filename,char* mode);
@@ -307,6 +319,24 @@ void deleteTOF(rec r,char* filename) {
         setHeaderTOF(&file,2,getHeaderTOF(&file,2)-1);
         closeTOF(&file);
     }
+}
+
+void loading_index(){          // sparse index
+    TOF file;
+    openTOF(&file,"TOF.bin","r");
+    int Nblk=getHeaderTOF(&file,1);
+    int i=1;
+    TOFblock buffer;
+    while (i<=Nblk)
+    {
+        readBlockTOF(&file,i,&buffer);
+        strcpy(file.index.array[i].id,buffer.array[buffer.Nb].id);
+        file.index.array[i].blk=i;
+        file.index.array[i].pos=buffer.Nb-1;
+        i++;
+    }
+    file.index.size=Nblk;
+    closeTOF(&file);
 }
 
 

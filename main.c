@@ -228,23 +228,23 @@ void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer) {
 }
 
 int main(){
-    // TOF File;
-    // open(&File,"TOF.bin","rb+");
-    // Tblock buf;
-    // printf("block number %d\n",getHeader(&File,1));
-    // printf("record number %d\n",getHeader(&File,2));
-    // printf("deleted recs %d\n",getHeader(&File,3));
-    // for (int i = 1; i <= getHeader(&File,1); i++)
-    // {
-    //     readBlock(&File,i,&buf);
-    //     printf("block %d\n",i);
-    //     for (int j = 0; j < buf.Nb; j++)
-    //     {
-    //         printf("the id is : %s\n",buf.array[j].id);
-    //     }
-    //     printf("\n\n");
-    // }
-    // close(&File);
+    TOF File;
+    open(&File,"TOF.bin","rb+");
+    Tblock buf1;
+    printf("block number %d\n",getHeader(&File,1));
+    printf("record number %d\n",getHeader(&File,2));
+    printf("deleted recs %d\n",getHeader(&File,3));
+    for (int i = 1; i <= getHeader(&File,1); i++)
+    {
+        readBlock(&File,i,&buf1);
+        printf("block %d\n",i);
+        for (int j = 0; j < buf1.Nb; j++)
+        {
+            printf("%s %d %s %s %s %s\n",buf1.array[j].id,buf1.array[j].del,buf1.array[j].first_name,buf1.array[j].last_name,buf1.array[j].birth_date,buf1.array[j].birth_city);
+        }
+        printf("\n\n");
+    }
+    close(&File);
     TOVS file;
     openTOVS(&file,"TOVS.bin","rb+");
     TOVSblock buf;

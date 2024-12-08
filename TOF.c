@@ -33,15 +33,15 @@ typedef struct index_array{
     int blk;
 }index_array;
 
-typedef struct index{
+typedef struct indexTOF{
     int size;
     index_array array[200];
-}index;
+}indexTOF;
 
 typedef struct TOF {
     TOFHeader header;
     FILE* f;
-    index index;
+    indexTOF index;
 }TOF;
 
 void openTOF(TOF* file,char* filename,char* mode);
@@ -242,8 +242,8 @@ void loading_TOF(){
     }
     char string[100];
     rec r;
-    fgets(string,100,F);
-    while ((fgets(string,100,F)))
+    fgets(string,sizeof(string),F);
+    while ((fgets(string,sizeof(string),F)))
     {
         int cpt=1;
         int index=0;
@@ -263,9 +263,6 @@ void loading_TOF(){
                     break;
                 case 4:
                     r.birth_date[i]='\0';
-                    break;
-                case 5:
-                    r.birth_city[i]='\0';
                     break;
                 }
                 i=0;
@@ -293,7 +290,7 @@ void loading_TOF(){
             }
             index++;
         }
-        r.birth_city[i]='\0';
+        r.birth_city[i-1]='\0';
         r.del=false;
         insertTOF(r,"TOF.bin");
     }
@@ -615,10 +612,10 @@ void deleteTOVS(char* filename,char* key) {
 typedef struct tovs_info{
         char id[6];
         char year[4];
-        char info[100];
+        char info[150];
 }tovs_info;
 
-bool search(char key[6] ,tovs_info* r){
+bool search(char* key ,tovs_info* r){
     FILE* F;
     F = fopen("students_data_2a.csv","r");
     if (F==NULL)
@@ -628,8 +625,8 @@ bool search(char key[6] ,tovs_info* r){
     }
     char string[200];
     int count=1;
-    fgets(string,200,F);
-    while (fgets(string,200,F))
+    fgets(string,sizeof(string),F);
+    while (fgets(string,sizeof(string),F))
     {
         int cpt=1;
         int index=0;
@@ -686,8 +683,8 @@ bool search(char key[6] ,tovs_info* r){
 void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
     if (*index==B)
     {
-        writeBlockTOVS(&tovs_f,*bnb,buffer2);
         (*bnb)++;
+        writeBlockTOVS(&tovs_f,*bnb,buffer2);
         *index=0;
     }
     else
@@ -698,7 +695,6 @@ void next_block(TOVS tovs_f,int *bnb,int *index,TOVSblock buffer2){
 
 
 void loading_TOVS(){
-    int mycpt=0;
     TOF tof_f;
     TOVS tovs_f;
     openTOF(&tof_f,"TOF.bin","rb+");
@@ -814,8 +810,6 @@ void loading_TOVS(){
             }
             if (search(buffer1.array[j].id,&info))
                 {
-                    mycpt++;
-                    // printf("%d\n",mycpt);
                     cpt=1;
                     k=0;
                     while (cpt<=2)
@@ -887,8 +881,8 @@ void loading_TOVS(){
 
 
 int main(){
-    // createTOF("TOF.bin");
-    // loading_TOF();
+    createTOF("TOF.bin");
+    loading_TOF();
     createTOVS("TOVS.bin");
     loading_TOVS();
     TOVS tovs_f;

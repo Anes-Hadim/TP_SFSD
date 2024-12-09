@@ -248,7 +248,7 @@ void loading_TOF(){
         int cpt=1;
         int index=0;
         int i=0;
-        while(string[index]!='\n') {
+        while(string[index]!='\r') {
             if (string[index]==',') {
                 switch (cpt)
                 {
@@ -290,7 +290,7 @@ void loading_TOF(){
             }
             index++;
         }
-        r.birth_city[i-1]='\0';
+        r.birth_city[i]='\0';
         r.del=false;
         insertTOF(r,"TOF.bin");
     }

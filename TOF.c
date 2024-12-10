@@ -474,7 +474,7 @@ void extract_string(TOVS* file,TOVSblock* buf,int* blk,int* pos,char* val,char* 
         val[k]=buf->array[*pos];
         (*pos)++;
         k++;
-        if(*pos>=MAX) {
+        if(*pos>=B) {
             (*blk)++;
             readBlockTOVS(file,*blk,buf);
             *pos=0;
@@ -482,7 +482,7 @@ void extract_string(TOVS* file,TOVSblock* buf,int* blk,int* pos,char* val,char* 
     } while(buf->array[*pos]!=FieldSep);
     val[k]='\0';
     (*pos)++;
-    if(*pos>=MAX) {
+    if(*pos>=B) {
         (*blk)++;
         readBlockTOVS(file,*blk,buf);
         *pos=0;
@@ -519,14 +519,14 @@ void searchTOVS(char* filename,char* key,bool* found,int* blk,int* pos) {
             } else {
                 do {
                     (*pos)++;
-                    if(*pos>=MAX) {
+                    if(*pos>=B) {
                         (*blk)++;
                         readBlockTOVS(&file,*blk,&buf);
                         *pos=0;
                     }
                 }while(buf.array[*pos]!=RecSep);
                 (*pos)++;
-                if(*pos>=MAX) {
+                if(*pos>=B) {
                     (*blk)++;
                     readBlockTOVS(&file,*blk,&buf);
                     *pos=0;
@@ -564,7 +564,7 @@ void insertTOVS(char* filename,char* rec) {
             rec[i]=temp;
             i++;
             pos++;
-            if(pos>=MAX) {
+            if(pos>=B) {
                 pos=0;
                 writeBlockTOVS(&file,blk,buf);
                 blk++;
@@ -575,7 +575,7 @@ void insertTOVS(char* filename,char* rec) {
             }
         }
         while(i<strlen(rec)) {
-            if(pos>=MAX) {
+            if(pos>=B) {
                 pos=0;
                 writeBlockTOVS(&file,blk,buf);
                 blk++;
@@ -597,6 +597,7 @@ void deleteTOVS(char* filename,char* key) {
     int blk,pos;
     searchTOVS(filename,key,&found,&blk,&pos);
     if(found) {
+        printf("%s was found\n",key);
         TOVS file;
         TOVSblock buf;
         openTOVS(&file,filename,"rb+");
@@ -606,6 +607,9 @@ void deleteTOVS(char* filename,char* key) {
         setHeaderTOVS(&file,3,getHeaderTOVS(&file,3)+1);
         writeBlockTOVS(&file,blk,buf);
         closeTOVS(&file);
+    }
+    else{
+        printf("%s was not found\n",key);
     }
 }
 
@@ -910,13 +914,13 @@ void delete_given_recs() {
 int main(){
     // createTOF("TOF.bin");
     // loading_TOF();
-    // createTOVS("TOVS.bin");
-    // loading_TOVS();
-    // TOVS tovs_f;
-    // openTOVS(&tovs_f,"TOVS.bin","rb+");
-    // printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
-    // printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
-    // closeTOVS(&tovs_f);
+    createTOVS("TOVS.bin");
+    loading_TOVS();
+    TOVS tovs_f;
+    openTOVS(&tovs_f,"TOVS.bin","rb+");
+    printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
+    printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
+    closeTOVS(&tovs_f);
     delete_given_recs();
     return 0;
 }

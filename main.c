@@ -227,7 +227,7 @@ void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer) {
     fwrite(&buffer,sizeof(TOVSblock),1,file->f);
 }
 
-int main(){
+int main() {
     // TOF File;
     // open(&File,"TOF.bin","rb+");
     // Tblock buf1;
@@ -252,7 +252,7 @@ int main(){
     printf("record number %d\n",getHeaderTOVS(&file,2));
     printf("deleted number %d\n",getHeaderTOVS(&file,3));
     printf("pos %d\n",getHeaderTOVS(&file,4));
-    for (int i = 1; i <50; i++)
+    for (int i = 1; i <getHeaderTOVS(&file,1); i++)
     {
         readBlockTOVS(&file,i,&buf);
         printf("\nblock %d\n",i);
@@ -267,18 +267,18 @@ int main(){
             }
         }
     }
-    // readBlockTOVS(&file,getHeaderTOVS(&file,1),&buf);
-    // printf("\nblock %d\n",getHeaderTOVS(&file,1));
-    // for (int j = 0; j < getHeaderTOVS(&file,4); j++)
-    // {
-    //     if (buf.array[j]==RecSep) {
-    //         printf("\n");
-    //     } else if (buf.array[j]==FieldSep) {
-    //         printf(" ");
-    //     } else {
-    //         printf("%c",buf.array[j]);
-    //     }
-    // }
+    readBlockTOVS(&file,getHeaderTOVS(&file,1),&buf);
+    printf("\nblock %d\n",getHeaderTOVS(&file,1));
+    for (int j = 0; j < getHeaderTOVS(&file,4); j++)
+    {
+        if (buf.array[j]==RecSep) {
+            printf("\n");
+        } else if (buf.array[j]==FieldSep) {
+            printf(" ");
+        } else {
+            printf("%c",buf.array[j]);
+        }
+    }
     closeTOVS(&file);
     return 0;
 }

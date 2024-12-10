@@ -228,23 +228,23 @@ void writeBlockTOVS(TOVS* file,int Bnb,TOVSblock buffer) {
 }
 
 int main(){
-    TOF File;
-    open(&File,"TOF.bin","rb+");
-    Tblock buf1;
-    printf("block number %d\n",getHeader(&File,1));
-    printf("record number %d\n",getHeader(&File,2));
-    printf("deleted recs %d\n",getHeader(&File,3));
-    for (int i = 1; i <= getHeader(&File,1); i++)
-    {
-        readBlock(&File,i,&buf1);
-        printf("block %d\n",i);
-        for (int j = 0; j < buf1.Nb; j++)
-        {
-            printf("%s %d %s %s %s %s\n",buf1.array[j].id,buf1.array[j].del,buf1.array[j].first_name,buf1.array[j].last_name,buf1.array[j].birth_date,buf1.array[j].birth_city);
-        }
-        printf("\n\n");
-    }
-    close(&File);
+    // TOF File;
+    // open(&File,"TOF.bin","rb+");
+    // Tblock buf1;
+    // printf("block number %d\n",getHeader(&File,1));
+    // printf("record number %d\n",getHeader(&File,2));
+    // printf("deleted recs %d\n",getHeader(&File,3));
+    // for (int i = 1; i <= getHeader(&File,1); i++)
+    // {
+    //     readBlock(&File,i,&buf1);
+    //     printf("block %d\n",i);
+    //     for (int j = 0; j < buf1.Nb; j++)
+    //     {
+    //         printf("%s %d %s %s %s %s\n",buf1.array[j].id,buf1.array[j].del,buf1.array[j].first_name,buf1.array[j].last_name,buf1.array[j].birth_date,buf1.array[j].birth_city);
+    //     }
+    //     printf("\n\n");
+    // }
+    // close(&File);
     TOVS file;
     openTOVS(&file,"TOVS.bin","rb+");
     TOVSblock buf;
@@ -252,7 +252,7 @@ int main(){
     printf("record number %d\n",getHeaderTOVS(&file,2));
     printf("deleted number %d\n",getHeaderTOVS(&file,3));
     printf("pos %d\n",getHeaderTOVS(&file,4));
-    for (int i = 1; i <getHeaderTOVS(&file,1); i++)
+    for (int i = 1; i <50; i++)
     {
         readBlockTOVS(&file,i,&buf);
         printf("\nblock %d\n",i);
@@ -267,18 +267,18 @@ int main(){
             }
         }
     }
-    readBlockTOVS(&file,getHeaderTOVS(&file,1),&buf);
-    printf("\nblock %d\n",getHeaderTOVS(&file,1));
-    for (int j = 0; j < getHeaderTOVS(&file,4); j++)
-    {
-        if (buf.array[j]==RecSep) {
-            printf("\n");
-        } else if (buf.array[j]==FieldSep) {
-            printf(" ");
-        } else {
-            printf("%c",buf.array[j]);
-        }
-    }
+    // readBlockTOVS(&file,getHeaderTOVS(&file,1),&buf);
+    // printf("\nblock %d\n",getHeaderTOVS(&file,1));
+    // for (int j = 0; j < getHeaderTOVS(&file,4); j++)
+    // {
+    //     if (buf.array[j]==RecSep) {
+    //         printf("\n");
+    //     } else if (buf.array[j]==FieldSep) {
+    //         printf(" ");
+    //     } else {
+    //         printf("%c",buf.array[j]);
+    //     }
+    // }
     closeTOVS(&file);
     return 0;
 }

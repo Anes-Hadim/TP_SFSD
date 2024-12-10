@@ -248,7 +248,7 @@ void loading_TOF(){
         int cpt=1;
         int index=0;
         int i=0;
-        while(string[index]!='\r') {
+        while(string[index]!='\0') {
             if (string[index]==',') {
                 switch (cpt)
                 {
@@ -499,12 +499,12 @@ void searchTOVS(char* filename,char* key,bool* found,int* blk,int* pos) {
     TOVS file;
     openTOVS(&file,filename,"rb+");
     TOVSblock buf;
-    char val[15];
+    char val[6];
     char del;
     bool stop=false;
     readBlockTOVS(&file,*blk,&buf);
-    int count=0;
-    int nbrec=getHeaderTOVS(&file,2)+getHeaderTOVS(&file,3);
+    int count=0; //number of records processed
+    int nbrec=getHeaderTOVS(&file,2)+getHeaderTOVS(&file,3); //total number of records (deleted and !deleted)
     while(count<nbrec && !(*found) && !stop) {
         if(count!=0 && strcmp(val,key)>0) {
             stop=true; //here pos is the new rec of the second biggest rec to key
@@ -879,16 +879,44 @@ void loading_TOVS(){
     closeTOVS(&tovs_f);
 }
 
+void delete_given_recs() {
+    FILE* F;
+    int counter=2;
+    F = fopen("delete_students.csv","r");
+    if (F==NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    char string[10];
+    char id[6];
+    fgets(string,10,F);
+    while(fgets(string,10,F)) {
+        for(int i=0;i<5;i++) {
+            id[i]=string[i];
+        }
+        id[5]='\0';
+        printf("deleted line %d with id %s\n",counter,id);
+        counter++;
+        deleteTOVS("TOVS.bin",id);
+    }
+    fclose(F);
+}
+
+// void check(){
+
+// }
 
 int main(){
-    createTOF("TOF.bin");
-    loading_TOF();
-    createTOVS("TOVS.bin");
-    loading_TOVS();
-    TOVS tovs_f;
-    openTOVS(&tovs_f,"TOVS.bin","rb+");
-    printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
-    printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
-    closeTOVS(&tovs_f);
+    // createTOF("TOF.bin");
+    // loading_TOF();
+    // createTOVS("TOVS.bin");
+    // loading_TOVS();
+    // TOVS tovs_f;
+    // openTOVS(&tovs_f,"TOVS.bin","rb+");
+    // printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
+    // printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
+    // closeTOVS(&tovs_f);
+    delete_given_recs();
     return 0;
 }

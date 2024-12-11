@@ -611,33 +611,53 @@ void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
     TOVS file;
     openTOVS(&file, filename, "rb+");
     TOVSblock buf;
-    char val[6];
-    char del;
-    bool stop = false;
-    readBlockTOVS(&file, *blk, &buf);
-    int count = 0;                                                 // number of records processed
-    int nbrec = getHeaderTOVS(&file, 2) + getHeaderTOVS(&file, 3); // total number of records (deleted and !deleted)
-    while (count < nbrec && !(*found) && !stop)
-    {
-        if (count != 0 && strcmp(val, key) > 0)
+    if (getHeaderTOVS(&file,1)==0) {
+        *blk=1;
+        *pos=0;
+        *found=false;
+    } else {
+        char val[6];
+        char del;
+        bool stop = false;
+        readBlockTOVS(&file, *blk, &buf);
+        int count = 0;                                                 // number of records processed
+        int nbrec = getHeaderTOVS(&file, 2) + getHeaderTOVS(&file, 3); // total number of records (deleted and !deleted)
+        while (count <= nbrec && !(*found) && !stop)
         {
-            stop = true;    // here pos is the new rec of the second biggest rec to key
-            *pos = prevPos; // so pos will point at the begining or the first largest res
-            *blk = prevBlk; // it is exactly where we should begin the insertion
-        }
-        else
-        {
-            prevPos = *pos;
-            prevBlk = *blk;
-            extract_string(&file, &buf, blk, pos, val, &del);
-            if (strcmp(val, key) == 0 && del == 'f')
+            if (count==nbrec) {
+                if (count != 0 && strcmp(val, key) > 0)
+                {
+                    *pos = prevPos;
+                    *blk = prevBlk;
+                }
+                stop=true;
+            } else if (count != 0 && strcmp(val, key) > 0)
             {
-                *found = true; // will stop pos at the del field
+                stop = true;    // here pos is the new rec of the second biggest rec to key
+                *pos = prevPos; // so pos will point at the begining or the first largest res
+                *blk = prevBlk; // it is exactly where we should begin the insertion
             }
             else
             {
-                do
+                prevPos = *pos;
+                prevBlk = *blk;
+                extract_string(&file, &buf, blk, pos, val, &del);
+                if (strcmp(val, key) == 0 && del == 'f')
                 {
+                    *found = true; // will stop pos at the del field
+                }
+                else
+                {
+                    do
+                    {
+                        (*pos)++;
+                        if (*pos >= B)
+                        {
+                            (*blk)++;
+                            readBlockTOVS(&file, *blk, &buf);
+                            *pos = 0;
+                        }
+                    } while (buf.array[*pos] != RecSep);
                     (*pos)++;
                     if (*pos >= B)
                     {
@@ -645,23 +665,17 @@ void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
                         readBlockTOVS(&file, *blk, &buf);
                         *pos = 0;
                     }
-                } while (buf.array[*pos] != RecSep);
-                (*pos)++;
-                if (*pos >= B)
-                {
-                    (*blk)++;
-                    readBlockTOVS(&file, *blk, &buf);
-                    *pos = 0;
-                }
-            } // will stop pos at the first char of the new rec
+                } // will stop pos at the first char of the new rec
+            }
+            count++; // because of count we will never need to test if we are in the last block and pos > NB
         }
-        count++; // because of count we will never need to test if we are in the last block and pos > NB
     }
     closeTOVS(&file);
 }
 
-void insertTOVS(char *filename, char *rec)
+void insertTOVS(char *filename, char rec[200])
 {
+    //rec will not be empty
     bool found;
     int blk, pos;
     char key[6];
@@ -673,6 +687,11 @@ void insertTOVS(char *filename, char *rec)
     } while (rec[i] != FieldSep);
     key[i] = '\0';
     searchTOVS(filename, key, &found, &blk, &pos);
+    // if(strcmp(key,"19685")==0) {
+    //     printf("it is not the search so the insertion\n");
+    //     printf("blk is %d and pos is %d\n",blk,pos);
+    // }
+    printf("id %s in blk %d and pos %d\n",key,blk,pos);
     if (!found)
     {
         TOVS file;
@@ -696,8 +715,12 @@ void insertTOVS(char *filename, char *rec)
                     blk++;
                 }
             }
-            writeBlockTOVS(&file,blk,buf);
-            setHeaderTOVS(&file,1,blk);
+            if(pos!=0) {
+                writeBlockTOVS(&file,blk,buf);
+                setHeaderTOVS(&file,1,blk);
+            } else {
+                setHeaderTOVS(&file,1,blk-1);   
+            }
             setHeaderTOVS(&file, 2,1);
             setHeaderTOVS(&file, 4, pos);
         } else {
@@ -716,24 +739,35 @@ void insertTOVS(char *filename, char *rec)
                     blk++;
                     readBlockTOVS(&file, blk, &buf);
                 }
-                if (i >= strlen(rec))
-                {
-                    i = 0;
+                if(rec[i]=='\0') {
+                    i=0;
                 }
             }
-            while (i < strlen(rec))
+            int size=strlen(rec);
+            int count=0;
+            while (count<size)
             {
+                buf.array[pos] = rec[i];
+                pos++;
+                i++;
+                if (i==size) {
+                    i=0;
+                }
                 if (pos >= B)
                 {
                     pos = 0;
                     writeBlockTOVS(&file, blk, buf);
                     blk++;
                 }
-                buf.array[pos] = rec[i];
-                pos++;
-                i++;
+                count++;
             }
-            writeBlockTOVS(&file, blk, buf);
+            // if(pos!=0) {
+            //     writeBlockTOVS(&file,blk,buf);
+            //     setHeaderTOVS(&file,1,blk);
+            // } else {
+            //     setHeaderTOVS(&file,1,blk-1);   
+            // }
+            writeBlockTOVS(&file,blk,buf);
             setHeaderTOVS(&file,1,blk);
             setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
             setHeaderTOVS(&file, 4, pos);
@@ -749,7 +783,6 @@ void deleteTOVS(char *filename, char *key)
     searchTOVS(filename, key, &found, &blk, &pos);
     if (found)
     {
-        // printf("%s was found\n",key);
         TOVS file;
         TOVSblock buf;
         openTOVS(&file, filename, "rb+");
@@ -759,10 +792,6 @@ void deleteTOVS(char *filename, char *key)
         setHeaderTOVS(&file, 3, getHeaderTOVS(&file, 3) + 1);
         writeBlockTOVS(&file, blk, buf);
         closeTOVS(&file);
-    }
-    else
-    {
-        // printf("%s was not found\n",key);
     }
 }
 
@@ -866,12 +895,16 @@ bool loading_TOVS()
         r.info[i] = '\0';
         // traitement
         // 1-search tof (r.id)
+        // char id[]="19685";
+        // if(strcmp(r.id,id)==0) {
+        //     break;
+        // }
         bool found;
         int blk, pos;
         binary_search("TOF.bin", r.id, &found, &blk, &pos);
         if (found)
         {
-            printf("id %s found\n", r.id);
+            // printf("id %s found\n", r.id);
             rec r_TOF;
             TOF tof_f;
             TOFblock buf;
@@ -880,12 +913,12 @@ bool loading_TOVS()
             r_TOF = buf.array[pos];
             // 2-create string
             char final_str[200];
-            printf("tof rec was brought\n");
+            // printf("tof rec was brought\n");
             create_string(r_TOF, r, final_str);
-            printf("tovs string was created : %s\n",final_str);
+            // printf("tovs string was created : %s\n",final_str);
             // 3-insert TOVS
             insertTOVS("TOVS.bin", final_str);
-            printf("it was inserted\n");
+            // printf("it was inserted\n");
             closeTOF(&tof_f);
         }
         count = 0;

@@ -664,7 +664,7 @@ void insertTOVS(char *filename, char *rec)
 {
     bool found;
     int blk, pos;
-    char key[15];
+    char key[6];
     int i = 0;
     do
     {
@@ -680,44 +680,64 @@ void insertTOVS(char *filename, char *rec)
         openTOVS(&file, filename, "rb+");
         char temp;
         i = 0;
-        readBlockTOVS(&file, blk, &buf);
         int endBlk = getHeaderTOVS(&file, 1);
         int endPos = getHeaderTOVS(&file, 4);
-        while (endBlk != blk || endPos != pos)
-        {
-            temp = buf.array[pos];
-            buf.array[pos] = rec[i];
-            rec[i] = temp;
-            i++;
-            pos++;
-            if (pos >= B)
-            {
-                pos = 0;
-                writeBlockTOVS(&file, blk, buf);
-                blk++;
-                readBlockTOVS(&file, blk, &buf);
+        if (endBlk==0) {
+            blk=1;
+            pos=0;
+            i=0;
+            while(rec[i]!='\0') {
+                buf.array[pos]=rec[i];
+                i++;
+                pos++;
+                if(pos==B) {
+                    pos=0;
+                    writeBlockTOVS(&file,blk,buf);
+                    blk++;
+                }
             }
-            if (i >= strlen(rec))
+            writeBlockTOVS(&file,blk,buf);
+            setHeaderTOVS(&file,1,blk);
+            setHeaderTOVS(&file, 2,1);
+            setHeaderTOVS(&file, 4, pos);
+        } else {
+            readBlockTOVS(&file, blk, &buf);
+            while (endBlk != blk || endPos != pos)
             {
-                i = 0;
+                temp = buf.array[pos];
+                buf.array[pos] = rec[i];
+                rec[i] = temp;
+                i++;
+                pos++;
+                if (pos >= B)
+                {
+                    pos = 0;
+                    writeBlockTOVS(&file, blk, buf);
+                    blk++;
+                    readBlockTOVS(&file, blk, &buf);
+                }
+                if (i >= strlen(rec))
+                {
+                    i = 0;
+                }
             }
+            while (i < strlen(rec))
+            {
+                if (pos >= B)
+                {
+                    pos = 0;
+                    writeBlockTOVS(&file, blk, buf);
+                    blk++;
+                }
+                buf.array[pos] = rec[i];
+                pos++;
+                i++;
+            }
+            writeBlockTOVS(&file, blk, buf);
+            setHeaderTOVS(&file,1,blk);
+            setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
+            setHeaderTOVS(&file, 4, pos);
         }
-        while (i < strlen(rec))
-        {
-            if (pos >= B)
-            {
-                pos = 0;
-                writeBlockTOVS(&file, blk, buf);
-                blk++;
-                setHeaderTOVS(&file, 1, blk);
-            }
-            buf.array[pos] = rec[i];
-            pos++;
-            i++;
-        }
-        writeBlockTOVS(&file, blk, buf);
-        setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
-        setHeaderTOVS(&file, 4, pos);
         closeTOVS(&file);
     }
 }

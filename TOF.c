@@ -715,12 +715,8 @@ void insertTOVS(char *filename, char rec[200])
                     blk++;
                 }
             }
-            if(pos!=0) {
-                writeBlockTOVS(&file,blk,buf);
-                setHeaderTOVS(&file,1,blk);
-            } else {
-                setHeaderTOVS(&file,1,blk-1);   
-            }
+            writeBlockTOVS(&file,blk,buf);
+            setHeaderTOVS(&file,1,blk);
             setHeaderTOVS(&file, 2,1);
             setHeaderTOVS(&file, 4, pos);
         } else {
@@ -761,12 +757,6 @@ void insertTOVS(char *filename, char rec[200])
                 }
                 count++;
             }
-            // if(pos!=0) {
-            //     writeBlockTOVS(&file,blk,buf);
-            //     setHeaderTOVS(&file,1,blk);
-            // } else {
-            //     setHeaderTOVS(&file,1,blk-1);   
-            // }
             writeBlockTOVS(&file,blk,buf);
             setHeaderTOVS(&file,1,blk);
             setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);

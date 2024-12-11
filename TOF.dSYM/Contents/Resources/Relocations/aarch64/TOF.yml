@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/aneshadim/Documents/GitHub/TP_SFSD/TOF'
+relocations:     []
+...

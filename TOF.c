@@ -297,10 +297,10 @@ void loading_TOF(){
     fclose(F);
 }
 
-void deleteTOF(rec r,char* filename) {
+void deleteTOF(char* id,char* filename) {
     bool found;
     int blk,pos;
-    binary_search(filename,r.id,&found,&blk,&pos);
+    binary_search(filename,id,&found,&blk,&pos);
     if(found) {
         TOF file;
         TOFblock buf;
@@ -883,7 +883,7 @@ void loading_TOVS(){
     closeTOVS(&tovs_f);
 }
 
-void delete_given_recs() {
+void delete_given_recsTOVS() {
     FILE* F;
     int counter=2;
     F = fopen("delete_students.csv","r");
@@ -907,6 +907,30 @@ void delete_given_recs() {
     fclose(F);
 }
 
+void delete_given_recsTOF() {
+    FILE* F;
+    int counter=2;
+    F = fopen("delete_students.csv","r");
+    if (F==NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    char string[10];
+    char id[6];
+    fgets(string,10,F);
+    while(fgets(string,10,F)) {
+        for(int i=0;i<5;i++) {
+            id[i]=string[i];
+        }
+        id[5]='\0';
+        printf("deleted line %d with id %s\n",counter,id);
+        counter++;
+        deleteTOF(id,"TOF.bin");
+    }
+    fclose(F);
+}
+
 // void check(){
 
 // }
@@ -921,6 +945,6 @@ int main(){
     printf("number of blocks is :%d\n",getHeaderTOVS(&tovs_f,1));
     printf("number of records is :%d\n",getHeaderTOVS(&tovs_f,2));
     closeTOVS(&tovs_f);
-    delete_given_recs();
+    delete_given_recsTOVS();
     return 0;
 }

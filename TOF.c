@@ -6,6 +6,12 @@
 #define MAX 100
 #define LoadFact 0.75 // loading factor for bulk loading
 
+
+int writenum=0;
+int readnum=0;
+int fragmentation=0;
+int missing_values=0;
+
 typedef struct rec
 {
     char id[6];
@@ -167,6 +173,7 @@ void binary_search(char *filename, char *key, bool *found, int *blk, int *pos)
     {
         *blk = (lo + up) / 2;
         readBlockTOF(&file, *blk, &buf);
+        readnum++;
         if (strcmp(key, buf.array[0].id) >= 0 && strcmp(key, buf.array[buf.Nb - 1].id) <= 0)
         {
             int inf = 0, sup = buf.Nb - 1;
@@ -224,6 +231,8 @@ void insertTOF(rec r, char *filename)
     binary_search(filename, r.id, &found, &blk, &pos);
     if (!found)
     {
+        //TOF fragmentation
+        fragmentation+=sizeof(rec)-(strlen(r.id)+strlen(r.first_name)+strlen(r.last_name)+strlen(r.birth_city)+strlen(r.birth_date)+1);
         TOF file;
         TOFblock buf;
         openTOF(&file, filename, "rb+");
@@ -234,17 +243,20 @@ void insertTOF(rec r, char *filename)
             buf.deleted = 0;
             setHeaderTOF(&file, 1, 1);
             writeBlockTOF(&file, 1, buf);
+            writenum++;
         }
         else
         {
             bool continu = true;
             rec x;
             readBlockTOF(&file, blk, &buf);
+            readnum++;
             if (pos == buf.Nb)
             {
                 buf.array[buf.Nb] = r;
                 buf.Nb++;
                 writeBlockTOF(&file, blk, buf);
+                writenum++;
                 continu = false;
             }
             while (continu && blk <= getHeaderTOF(&file, 1))
@@ -262,11 +274,13 @@ void insertTOF(rec r, char *filename)
                     buf.Nb++;
                     buf.array[buf.Nb - 1] = x;
                     writeBlockTOF(&file, blk, buf);
+                    writenum++;
                     continu = false;
                 }
                 else
                 {
                     writeBlockTOF(&file, blk, buf);
+                    writenum++;
                     blk++;
                     pos = 0;
                     r = x;
@@ -274,6 +288,7 @@ void insertTOF(rec r, char *filename)
                 if (continu && blk <= getHeaderTOF(&file, 1))
                 {
                     readBlockTOF(&file, blk, &buf);
+                    readnum++;
                 }
             }
             if (blk > getHeaderTOF(&file, 1))
@@ -282,16 +297,20 @@ void insertTOF(rec r, char *filename)
                 buf.Nb = 1;
                 buf.deleted = 0;
                 writeBlockTOF(&file, blk, buf);
+                writenum++;
                 setHeaderTOF(&file, 1, blk);
             }
         }
         setHeaderTOF(&file, 2, getHeaderTOF(&file, 2) + 1);
         closeTOF(&file);
+    } else {
+        printf("insertion failed : the record with id %s already exists\n",r.id);
     }
 }
 
 void loading_TOF()
 {
+    fragmentation=0;
     FILE *F;
     F = fopen("students_data_1a.csv", "r");
     if (F == NULL)
@@ -299,6 +318,19 @@ void loading_TOF()
         perror("opening file");
         exit(1);
     }
+
+    readnum=0;
+    writenum=0;
+    FILE *statsTOF;
+    statsTOF = fopen("statsTOF.txt", "a+");
+    if (statsTOF == NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    fprintf(statsTOF, "insertion of the following ids\n\n\n");
+
+
     char string[100];
     rec r;
     fgets(string, sizeof(string), F);
@@ -355,8 +387,15 @@ void loading_TOF()
         }
         r.birth_city[i] = '\0';
         r.del = false;
+        
         insertTOF(r, "TOF.bin");
+
+        fprintf(statsTOF, "insertion of the id %s costed %d reads (including the search) and %d writes\n",r.id,readnum,writenum);
+        readnum = 0;
+        writenum = 0; 
+        
     }
+    fclose(statsTOF);
     fclose(F);
 }
 
@@ -371,9 +410,11 @@ void deleteTOF(char *id, char *filename)
         TOFblock buf;
         openTOF(&file, filename, "rb+");
         readBlockTOF(&file, blk, &buf);
+        readnum++;
         buf.array[pos].del = true;
         buf.deleted++;
         writeBlockTOF(&file, blk, buf);
+        writenum++;
         if (blk == 1 && buf.Nb - buf.deleted == 0)
         {
             setHeaderTOF(&file, 1, 0);
@@ -381,6 +422,8 @@ void deleteTOF(char *id, char *filename)
         setHeaderTOF(&file, 3, getHeaderTOF(&file, 3) + 1);
         setHeaderTOF(&file, 2, getHeaderTOF(&file, 2) - 1);
         closeTOF(&file);
+    } else {
+        printf("deletion failed : the record with id %s does not exist\n",id);
     }
 }
 
@@ -394,6 +437,16 @@ void delete_given_recsTOF()
         perror("opening file");
         exit(1);
     }
+
+    FILE *statsTOF;
+    statsTOF = fopen("statsTOF.txt", "a+");
+    if (statsTOF == NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+    fprintf(statsTOF, "deletion of the following ids\n\n\n");
+
     char string[10];
     char id[6];
     fgets(string, 10, F);
@@ -407,8 +460,13 @@ void delete_given_recsTOF()
         // printf("deleted line %d with id %s\n",counter,id);
         // counter++;
         deleteTOF(id, "TOF.bin");
+
+        fprintf(statsTOF,"deletion of the id %s costed %d reads (including the search) and %d writes\n",id,readnum,writenum);
+        readnum = 0;
+        writenum = 0; 
     }
     fclose(F);
+    fclose(statsTOF);
 }
 
 void loading_index()
@@ -427,6 +485,28 @@ void loading_index()
         i++;
     }
     file.index.size = Nblk;
+    closeTOF(&file);
+}
+
+void loading_fact() {
+    TOF file;
+    openTOF(&file, "TOF.bin", "r");
+    int Nblk = getHeaderTOF(&file, 1);
+    int nbrec = getHeaderTOF(&file, 2);
+    double avr_fact = (double) nbrec / (Nblk*MAX) ;
+    printf("average loading factor is %0.3lf\n",avr_fact);
+    closeTOF(&file);
+}
+
+void frag_stat() {
+    TOF file;
+    openTOF(&file, "TOF.bin", "r");
+    int nrec = getHeaderTOF(&file, 2);
+    printf("the TOF file has %d records each one with a capcity of %zu bytes\n",nrec,sizeof(rec));
+    printf("the alocated space for records is %zu bytes (without conting the remaining space inside each block)\n",nrec*sizeof(rec));
+    printf("the unused space inside the records is %d bytes\n",fragmentation);
+    printf("the fragmentation rate is %0.3lf\n",(double)fragmentation/(nrec*sizeof(rec)));
+
     closeTOF(&file);
 }
 
@@ -620,6 +700,7 @@ void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
         char del;
         bool stop = false;
         readBlockTOVS(&file, *blk, &buf);
+        readnum++;
         int count = 0;                                                 // number of records processed
         int nbrec = getHeaderTOVS(&file, 2) + getHeaderTOVS(&file, 3); // total number of records (deleted and !deleted)
         while (count <= nbrec && !(*found) && !stop)
@@ -655,6 +736,7 @@ void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
                         {
                             (*blk)++;
                             readBlockTOVS(&file, *blk, &buf);
+                            readnum++;
                             *pos = 0;
                         }
                     } while (buf.array[*pos] != RecSep);
@@ -663,6 +745,7 @@ void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
                     {
                         (*blk)++;
                         readBlockTOVS(&file, *blk, &buf);
+                        readnum++;
                         *pos = 0;
                     }
                 } // will stop pos at the first char of the new rec
@@ -691,7 +774,7 @@ void insertTOVS(char *filename, char rec[200])
     //     printf("it is not the search so the insertion\n");
     //     printf("blk is %d and pos is %d\n",blk,pos);
     // }
-    printf("id %s in blk %d and pos %d\n",key,blk,pos);
+    // printf("id %s in blk %d and pos %d\n",key,blk,pos);
     if (!found)
     {
         TOVS file;
@@ -712,15 +795,18 @@ void insertTOVS(char *filename, char rec[200])
                 if(pos==B) {
                     pos=0;
                     writeBlockTOVS(&file,blk,buf);
+                    writenum++;
                     blk++;
                 }
             }
             writeBlockTOVS(&file,blk,buf);
+            writenum++;
             setHeaderTOVS(&file,1,blk);
             setHeaderTOVS(&file, 2,1);
             setHeaderTOVS(&file, 4, pos);
         } else {
             readBlockTOVS(&file, blk, &buf);
+            readnum++;
             while (endBlk != blk || endPos != pos)
             {
                 temp = buf.array[pos];
@@ -732,8 +818,10 @@ void insertTOVS(char *filename, char rec[200])
                 {
                     pos = 0;
                     writeBlockTOVS(&file, blk, buf);
+                    writenum++;
                     blk++;
                     readBlockTOVS(&file, blk, &buf);
+                    readnum++;
                 }
                 if(rec[i]=='\0') {
                     i=0;
@@ -753,16 +841,20 @@ void insertTOVS(char *filename, char rec[200])
                 {
                     pos = 0;
                     writeBlockTOVS(&file, blk, buf);
+                    writenum++;
                     blk++;
                 }
                 count++;
             }
             writeBlockTOVS(&file,blk,buf);
+            writenum++;
             setHeaderTOVS(&file,1,blk);
             setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
             setHeaderTOVS(&file, 4, pos);
         }
         closeTOVS(&file);
+    }else{
+        printf("insertion failed for the id : %s already exit\n",key);
     }
 }
 
@@ -777,11 +869,15 @@ void deleteTOVS(char *filename, char *key)
         TOVSblock buf;
         openTOVS(&file, filename, "rb+");
         readBlockTOVS(&file, blk, &buf);
+        readnum++;
         buf.array[pos] = 'v';
         setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) - 1);
         setHeaderTOVS(&file, 3, getHeaderTOVS(&file, 3) + 1);
         writeBlockTOVS(&file, blk, buf);
+        writenum++;
         closeTOVS(&file);
+    }else{
+        printf("deletion failed for the id : %s it does not exist\n",key);
     }
 }
 
@@ -823,8 +919,29 @@ void create_string(rec r, tovs_info c, char full_str[200])
     full_str[index] = '\0';
 }
 
+void missing_fields(char *string,char* id,char * field){
+
+    if (string[0]=='\0' || string[0]=='\n' || string[0]=='\r')
+    {
+        missing_values++;
+        printf("the id %s is missing %s\n",id,field);
+    }
+}
+
+
 bool loading_TOVS()
-{
+{   
+    missing_values=0;
+
+    FILE *stat_F;
+    stat_F = fopen("statsTOVS.txt", "a+");
+    if (stat_F == NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+
+
     FILE *F;
     F = fopen("students_data_2a.csv", "r");
     if (F == NULL)
@@ -900,7 +1017,16 @@ bool loading_TOVS()
             TOFblock buf;
             openTOF(&tof_f, "TOF.bin", "r+");
             readBlockTOF(&tof_f, blk, &buf);
+            readnum++;
             r_TOF = buf.array[pos];
+
+            //missing fields
+            missing_fields(r_TOF.first_name,r_TOF.id,"firstname");
+            missing_fields(r_TOF.last_name,r_TOF.id,"lastname");
+            missing_fields(r_TOF.birth_date,r_TOF.id,"birth date");
+            missing_fields(r_TOF.birth_city,r_TOF.id,"birth city");
+            missing_fields(r.year,r_TOF.id,"year");
+            missing_fields(r.info,r_TOF.id,"skills");
             // 2-create string
             char final_str[200];
             // printf("tof rec was brought\n");
@@ -912,8 +1038,13 @@ bool loading_TOVS()
             closeTOF(&tof_f);
         }
         count = 0;
+        fprintf(stat_F,"the statistics for the insertion of the id %s are : writes : %d \t\tand reads : %d\n",r.id,writenum,readnum);
+        writenum=0;
+        readnum=0;
     }
+    fprintf(stat_F,"\n THE statistics for deleted ids\n\n");
     fclose(F);
+    fclose(stat_F);
     return false;
 }
 
@@ -1104,6 +1235,15 @@ bool loading_TOVS()
 
 void delete_given_recsTOVS()
 {
+    
+    FILE *stat_F;
+    stat_F = fopen("statsTOVS.txt", "a+");
+    if (stat_F == NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+
     FILE *F;
     // int counter=2;
     F = fopen("delete_students.csv", "r");
@@ -1112,6 +1252,7 @@ void delete_given_recsTOVS()
         perror("opening file");
         exit(1);
     }
+
     char string[10];
     char id[6];
     fgets(string, 10, F);
@@ -1125,18 +1266,31 @@ void delete_given_recsTOVS()
         // printf("deleted line %d with id %s\n",counter,id);
         // counter++;
         deleteTOVS("TOVS.bin", id);
+        fprintf(stat_F,"the statistics for the deletion of the id %s are : writes : %d \t\tand reads : %d\n",id,writenum,readnum);
+        readnum=0;
+        writenum=0;
     }
+    fclose(stat_F);
     fclose(F);
 }
 
-// void check(){
 
-// }
 
 int main()
 {
-    // createTOF("TOF.bin");
-    // loading_TOF();
+    FILE *statsTOF;
+    statsTOF = fopen("statsTOF.txt", "w");
+    fclose(statsTOF);
+
+    FILE *statsTOVS;
+    statsTOVS = fopen("statsTOVS.txt", "w");
+    fclose(statsTOVS);
+    
+    createTOF("TOF.bin");
+    loading_TOF();
+    loading_fact();
+    frag_stat();
+
     createTOVS("TOVS.bin");
     loading_TOVS();
     TOVS tovs_f;
@@ -1144,7 +1298,10 @@ int main()
     printf("number of blocks is :%d\n", getHeaderTOVS(&tovs_f, 1));
     printf("number of records is :%d\n", getHeaderTOVS(&tovs_f, 2));
     closeTOVS(&tovs_f);
-    // delete_given_recsTOF();
-    // delete_given_recsTOVS();
+
+    delete_given_recsTOF();
+    loading_fact();
+
+    delete_given_recsTOVS();
     return 0;
 }

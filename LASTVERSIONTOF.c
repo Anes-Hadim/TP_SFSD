@@ -10,7 +10,23 @@
 int writenum=0;
 int readnum=0;
 int fragmentation=0;
-int missing_values=0;
+
+// missing_values //
+
+int miss_firstname=0;
+int miss_lastname=0;
+int miss_birthdate=0;
+int miss_birthcity=0;
+int miss_year=0;
+int miss_skill=0;
+
+// counters for failed and successed insertions and deletions //
+int failed_insert=0;
+int successed_insert=0;
+int failed_delete=0;
+int successed_delete=0;
+//-----------------------------------------//
+
 
 typedef struct rec
 {
@@ -39,7 +55,6 @@ typedef struct TOFHeader
 typedef struct index_array
 {
     char id[6];
-    int pos;
     int blk;
 } index_array;
 
@@ -55,6 +70,8 @@ typedef struct TOF
     FILE *f;
     indexTOF index;
 } TOF;
+
+TOF globalTOF;
 
 void openTOF(TOF *file, char *filename, char *mode);
 
@@ -302,9 +319,11 @@ void insertTOF(rec r, char *filename)
             }
         }
         setHeaderTOF(&file, 2, getHeaderTOF(&file, 2) + 1);
+        successed_insert++;
         closeTOF(&file);
     } else {
-        printf("insertion failed : the record with id %s already exists\n",r.id);
+        // printf("insertion failed : the record with id %s already exists\n",r.id);
+        failed_insert++;
     }
 }
 
@@ -421,16 +440,26 @@ void deleteTOF(char *id, char *filename)
         }
         setHeaderTOF(&file, 3, getHeaderTOF(&file, 3) + 1);
         setHeaderTOF(&file, 2, getHeaderTOF(&file, 2) - 1);
+        successed_delete++;
+        //in case of an index not yet 100% implemented 
+        //-----------------------------------------------------------------//
+        // if (pos==buf.Nb-1 && pos!=0)
+        // {
+        //     strcpy(globalTOF.index.array[blk-1].id , buf.array[pos-1].id);
+        // } else if (pos==buf.Nb-1 && pos==0) {
+        //     // right_shift_index(&globalTOF,blk-1,1);   not yet implemented
+        // }
+        //-----------------------------------------------------------------//
         closeTOF(&file);
     } else {
-        printf("deletion failed : the record with id %s does not exist\n",id);
+        // printf("deletion failed : the record with id %s does not exist\n",id);
+        failed_delete++;
     }
 }
 
 void delete_given_recsTOF()
 {
     FILE *F;
-    // int counter=2;
     F = fopen("delete_students.csv", "r");
     if (F == NULL)
     {
@@ -457,8 +486,6 @@ void delete_given_recsTOF()
             id[i] = string[i];
         }
         id[5] = '\0';
-        // printf("deleted line %d with id %s\n",counter,id);
-        // counter++;
         deleteTOF(id, "TOF.bin");
 
         fprintf(statsTOF,"deletion of the id %s costed %d reads (including the search) and %d writes\n",id,readnum,writenum);
@@ -469,24 +496,72 @@ void delete_given_recsTOF()
     fclose(statsTOF);
 }
 
-void loading_index()
+//-----------------------------------------//
+//-----------------------------------------//
+//INDEX TOF FFUNCTIONS
+//----------------------------------------//
+//----------------------------------------//
+
+void loading_index_TOF()
 { // sparse index
-    TOF file;
-    openTOF(&file, "TOF.bin", "r");
-    int Nblk = getHeaderTOF(&file, 1);
+    openTOF(&globalTOF, "TOF.bin", "r");
+    int Nblk = getHeaderTOF(&globalTOF, 1);
     int i = 1;
     TOFblock buffer;
     while (i <= Nblk)
     {
-        readBlockTOF(&file, i, &buffer);
-        strcpy(file.index.array[i].id, buffer.array[buffer.Nb].id);
-        file.index.array[i].blk = i;
-        file.index.array[i].pos = buffer.Nb - 1;
+        readBlockTOF(&globalTOF, i, &buffer);
+        strcpy(globalTOF.index.array[i-1].id, buffer.array[buffer.Nb-1].id);
+        globalTOF.index.array[i-1].blk = i;
         i++;
     }
-    file.index.size = Nblk;
-    closeTOF(&file);
+    globalTOF.index.size = Nblk;
+    closeTOF(&globalTOF);
 }
+
+void binary_search_index(bool *found,int *i,char key[6]){
+    *found=false;
+    int sup=globalTOF.index.size-1;
+    int inf=0;
+    if (strcmp(key,globalTOF.index.array[globalTOF.index.size-1].id)>0)
+    {
+        *i=globalTOF.index.array[globalTOF.index.size-1].blk;
+        *found=false;
+    } else {
+        while (sup>=inf && !(*found))
+        {
+            *i=(sup+inf)/2;
+            if (strcmp(key,globalTOF.index.array[*i].id)==0)
+            {
+                *found=true;
+            }else if(strcmp(key,globalTOF.index.array[*i].id)<0){
+                sup=(*i)-1;
+            }else{
+                inf=(*i)+1;
+            }
+        }
+        *i=globalTOF.index.array[*i].blk;
+        *found=true;
+    }
+}
+
+//not checked yet
+
+// void right_shift_index(TOF *file,int pos,int n){
+//     for (int i = file->index.size-1; i > pos; i--)
+//     {
+//         file->index.array[i+n]=file->index.array[i];
+//     }
+//     file->index.size+=n;
+// }
+
+// void left_shift_index(TOF *file,int pos,int n){
+//     for (int i = pos; i < file->index.size-n; i++)
+//     {
+//         file->index.array[i]=file->index.array[i+n];
+//     }
+//     file->index.size-=n;
+// }
 
 void loading_fact() {
     TOF file;
@@ -519,6 +594,18 @@ void frag_stat() {
 #define RecSep '#'
 #define FieldSep '@'
 
+typedef struct index_array_TOVS
+{
+    char id[6];
+    int blk;
+    int pos;
+} index_array_TOVS;
+
+typedef struct indexTOVS
+{
+    int size;
+    index_array_TOVS array[100001];
+} indexTOVS;
 typedef struct TOVSblock
 {
     char array[B];
@@ -536,7 +623,10 @@ typedef struct TOVS
 {
     TOVSHeader header;
     FILE *f;
+    indexTOVS index;
 } TOVS;
+
+TOVS globalTOVS;
 
 void openTOVS(TOVS *file, char *filename, char *mode);
 
@@ -770,11 +860,6 @@ void insertTOVS(char *filename, char rec[200])
     } while (rec[i] != FieldSep);
     key[i] = '\0';
     searchTOVS(filename, key, &found, &blk, &pos);
-    // if(strcmp(key,"19685")==0) {
-    //     printf("it is not the search so the insertion\n");
-    //     printf("blk is %d and pos is %d\n",blk,pos);
-    // }
-    // printf("id %s in blk %d and pos %d\n",key,blk,pos);
     if (!found)
     {
         TOVS file;
@@ -852,9 +937,11 @@ void insertTOVS(char *filename, char rec[200])
             setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
             setHeaderTOVS(&file, 4, pos);
         }
+        successed_insert++;
         closeTOVS(&file);
     }else{
-        printf("insertion failed for the id : %s already exit\n",key);
+        // printf("insertion failed for the id : %s already exit\n",key);
+        failed_delete++;
     }
 }
 
@@ -875,11 +962,95 @@ void deleteTOVS(char *filename, char *key)
         setHeaderTOVS(&file, 3, getHeaderTOVS(&file, 3) + 1);
         writeBlockTOVS(&file, blk, buf);
         writenum++;
+        successed_delete++;
         closeTOVS(&file);
     }else{
-        printf("deletion failed for the id : %s it does not exist\n",key);
+        // printf("deletion failed for the id : %s it does not exist\n",key);
+        failed_delete++;
     }
 }
+
+void loading_index_TOVS(){
+    openTOVS(&globalTOVS,"TOVS.bin","r");
+    TOVSblock buf;
+    bool search=true;  // search for field sep
+    int i=1;
+    int index=0;
+    int k=0;
+    while(i <= getHeaderTOVS(&globalTOVS,1)) 
+    {
+        readBlockTOVS(&globalTOVS,i,&buf);
+        int j=0;
+        while (j<B) {
+            if (buf.array[j]==FieldSep)
+            {
+                search=false;
+            } else if (search)
+            {
+                if (k==0) {
+                    globalTOVS.index.array[index].blk=i;
+                    globalTOVS.index.array[index].pos=j;
+                }
+                globalTOVS.index.array[index].id[k]=buf.array[j];
+                k++;
+            }
+            if (buf.array[j]==RecSep)
+            {
+                search=true;
+                globalTOVS.index.array[index].id[k]='\0';
+                k=0;
+                index++;
+            }
+            j++;
+        }
+        i++;
+    }
+    globalTOVS.index.size=index;
+    closeTOVS(&globalTOVS);
+}
+
+//archive
+//supposing that one recorde can't take a hole block
+//     openTOVS(&globalTOVS,"TOVS.bin","r");
+//     TOVSblock buf;
+//     int cpt=0;
+//     for (int i = 1; i <= getHeaderTOVS(&globalTOVS,1); i++)
+//     {   
+//         readBlockTOVS(&globalTOVS,i,&buf);
+//         int j;
+//         if (i!=getHeaderTOVS(&globalTOVS,1)) {
+//             j=B-1;
+//         } else if (getHeaderTOVS(&globalTOVS,4)!=0) {
+//             j=getHeaderTOVS(&globalTOVS,4)-1;
+//         } else {
+//             j=B-1;
+//         }
+//         if (buf.array[j]==RecSep)
+//         {
+//             j--;
+//         }
+//         while (buf.array[j]!=RecSep)
+//         {
+//             j--;
+//         }
+//         int k=0;
+//         int temp=i;
+//         while (buf.array[j]!=FieldSep)
+//         {
+//             j++;
+//             if(j==B) {
+//                 j=0;
+//                 temp++;
+//                 readBlockTOVS(&globalTOVS,temp,&buf);
+//             }
+//             globalTOVS.index.array[cpt].id[k]=buf.array[j];
+//             k++;
+//         }
+//         cpt++;
+//     }
+//     globalTOVS.index.size=cpt;
+//     closeTOVS(&globalTOVS);
+// }
 
 typedef struct tovs_info
 {
@@ -919,20 +1090,68 @@ void create_string(rec r, tovs_info c, char full_str[200])
     full_str[index] = '\0';
 }
 
+//  ----------------missing_fields------------------ //
+
 void missing_fields(char *string,char* id,char * field){
 
     if (string[0]=='\0' || string[0]=='\n' || string[0]=='\r')
     {
-        missing_values++;
-        printf("the id %s is missing %s\n",id,field);
+        if (strcmp(field,"firstname")==0)
+        {
+            miss_firstname++;
+        }
+        else if (strcmp(field,"lastname")==0)
+        {
+            miss_lastname++;
+        }
+        else if (strcmp(field,"birth date")==0)
+        {
+            miss_birthdate++;
+        }
+        else if (strcmp(field,"birth city")==0)
+        {
+            miss_birthcity++;
+        }
+        else if (strcmp(field,"year")==0)
+        {
+            miss_year++;
+        }
+        else if (strcmp(field,"skills")==0)
+        {
+            miss_skill++;
+        }
     }
 }
 
 
 bool loading_TOVS()
 {   
-    missing_values=0;
 
+    //-----------------//
+    miss_firstname=0;
+    miss_lastname=0;
+    miss_birthdate=0;
+    miss_birthcity=0;
+    miss_year=0;
+    miss_skill=0;
+    //-----------------//
+    failed_insert=0;
+    successed_insert=0;
+    failed_delete=0;
+    successed_delete=0;
+    //-----------------//
+
+    
+
+    FILE *missed;
+    missed=fopen("missing_fields.txt","a+");
+    if (missed == NULL)
+    {
+        perror("opening file");
+        exit(1);
+    }
+
+    // stats insertion and deletion //
     FILE *stat_F;
     stat_F = fopen("statsTOVS.txt", "a+");
     if (stat_F == NULL)
@@ -941,7 +1160,7 @@ bool loading_TOVS()
         exit(1);
     }
 
-
+    // csv 2 file for insertion //
     FILE *F;
     F = fopen("students_data_2a.csv", "r");
     if (F == NULL)
@@ -1002,16 +1221,11 @@ bool loading_TOVS()
         r.info[i] = '\0';
         // traitement
         // 1-search tof (r.id)
-        // char id[]="19685";
-        // if(strcmp(r.id,id)==0) {
-        //     break;
-        // }
         bool found;
         int blk, pos;
         binary_search("TOF.bin", r.id, &found, &blk, &pos);
         if (found)
         {
-            // printf("id %s found\n", r.id);
             rec r_TOF;
             TOF tof_f;
             TOFblock buf;
@@ -1029,12 +1243,10 @@ bool loading_TOVS()
             missing_fields(r.info,r_TOF.id,"skills");
             // 2-create string
             char final_str[200];
-            // printf("tof rec was brought\n");
             create_string(r_TOF, r, final_str);
-            // printf("tovs string was created : %s\n",final_str);
+            
             // 3-insert TOVS
             insertTOVS("TOVS.bin", final_str);
-            // printf("it was inserted\n");
             closeTOF(&tof_f);
         }
         count = 0;
@@ -1043,8 +1255,16 @@ bool loading_TOVS()
         readnum=0;
     }
     fprintf(stat_F,"\n THE statistics for deleted ids\n\n");
+    fprintf(missed,"the missing fields are : \n");
+    fprintf(missed,"the missing firstnames are : %d\n",miss_firstname);
+    fprintf(missed,"the missing lastnames are : %d\n",miss_lastname);
+    fprintf(missed,"the missing birthdates are : %d\n",miss_birthdate);
+    fprintf(missed,"the missing birthcities are : %d\n",miss_birthcity);
+    fprintf(missed,"the missing years are : %d\n",miss_year);
+    fprintf(missed,"the missing skills are : %d\n",miss_skill);
     fclose(F);
     fclose(stat_F);
+    fclose(missed);
     return false;
 }
 
@@ -1245,7 +1465,6 @@ void delete_given_recsTOVS()
     }
 
     FILE *F;
-    // int counter=2;
     F = fopen("delete_students.csv", "r");
     if (F == NULL)
     {
@@ -1263,8 +1482,6 @@ void delete_given_recsTOVS()
             id[i] = string[i];
         }
         id[5] = '\0';
-        // printf("deleted line %d with id %s\n",counter,id);
-        // counter++;
         deleteTOVS("TOVS.bin", id);
         fprintf(stat_F,"the statistics for the deletion of the id %s are : writes : %d \t\tand reads : %d\n",id,writenum,readnum);
         readnum=0;
@@ -1278,30 +1495,71 @@ void delete_given_recsTOVS()
 
 int main()
 {
-    FILE *statsTOF;
-    statsTOF = fopen("statsTOF.txt", "w");
-    fclose(statsTOF);
+    // FILE *statsTOF;
+    // statsTOF = fopen("statsTOF.txt", "w");
+    // fclose(statsTOF);
 
-    FILE *statsTOVS;
-    statsTOVS = fopen("statsTOVS.txt", "w");
-    fclose(statsTOVS);
+    // FILE *statsTOVS;
+    // statsTOVS = fopen("statsTOVS.txt", "w");
+    // fclose(statsTOVS);
     
+    // FILE *missing_val;
+    // missing_val=fopen("missing_fields.txt","w");
+    // fclose(missing_val);
+
     createTOF("TOF.bin");
     loading_TOF();
-    loading_fact();
-    frag_stat();
+    // loading_fact();
+    // frag_stat();
+
+    
+    // printf("this is for the TOF : \n");
+    // printf("the number of failed insertions is :%d\n",failed_insert);
+    // printf("the number of successed insertions is :%d\n",successed_insert);
 
     createTOVS("TOVS.bin");
     loading_TOVS();
-    TOVS tovs_f;
-    openTOVS(&tovs_f, "TOVS.bin", "rb+");
-    printf("number of blocks is :%d\n", getHeaderTOVS(&tovs_f, 1));
-    printf("number of records is :%d\n", getHeaderTOVS(&tovs_f, 2));
-    closeTOVS(&tovs_f);
 
-    delete_given_recsTOF();
-    loading_fact();
+    // delete_given_recsTOF();
+    // loading_fact();
+    // printf("the number of failed deletions is :%d\n",failed_delete);
+    // printf("the number of successed deletions is :%d\n",successed_delete);
 
-    delete_given_recsTOVS();
+    // TOVS tovs_f;
+    // openTOVS(&tovs_f, "TOVS.bin", "rb+");
+    // printf("number of blocks is :%d\n", getHeaderTOVS(&tovs_f, 1));
+    // printf("number of records is :%d\n", getHeaderTOVS(&tovs_f, 2));
+    // closeTOVS(&tovs_f);
+
+    // delete_given_recsTOVS();
+
+    // printf("this is for the TOVS : \n");
+    // printf("the number of failed insertions is :%d\n",failed_insert);
+    // printf("the number of successed insertions is %d\n",successed_insert);    
+    // printf("the number of failed deletions is :%d\n",failed_delete);
+    // printf("the number of successed deletions is :%d\n",successed_delete);
+
+
+    //INDEX TESTING
+    // loading_index_TOF();
+    // for (int j = 0; j < globalTOF.index.size; j++)
+    // {
+    //     printf("the %d id is : %s in block %d\n",j,globalTOF.index.array[j].id,globalTOF.index.array[j].blk);
+    // }
+    // int i;
+    // bool found;
+    // binary_search_index(&found,&i,"10153");
+    // printf("found is : %d\n",found);
+    // printf("the block is : %d\n",i);
+
+//     loading_index_TOVS();
+//     for (int j = 0; j < globalTOVS.index.size; j++)
+//     {
+//         printf("the %d id is : %s in block %d\n",j,globalTOF.index.array[j].id,globalTOF.index.array[j].blk);
+//     }
+
     return 0;
 }
+
+
+//  le cas //

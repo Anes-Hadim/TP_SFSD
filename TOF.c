@@ -56,6 +56,8 @@ typedef struct TOF
     indexTOF index;
 } TOF;
 
+TOF globalTOF;
+
 void openTOF(TOF *file, char *filename, char *mode);
 
 void closeTOF(TOF *file);
@@ -469,23 +471,48 @@ void delete_given_recsTOF()
     fclose(statsTOF);
 }
 
-void loading_index()
+void loading_index_TOF()
 { // sparse index
-    TOF file;
-    openTOF(&file, "TOF.bin", "r");
-    int Nblk = getHeaderTOF(&file, 1);
+    openTOF(&globalTOF, "TOF.bin", "r");
+    int Nblk = getHeaderTOF(&globalTOF, 1);
     int i = 1;
     TOFblock buffer;
     while (i <= Nblk)
     {
-        readBlockTOF(&file, i, &buffer);
-        strcpy(file.index.array[i].id, buffer.array[buffer.Nb].id);
-        file.index.array[i].blk = i;
-        file.index.array[i].pos = buffer.Nb - 1;
+        readBlockTOF(&globalTOF, i, &buffer);
+        strcpy(globalTOF.index.array[i-1].id, buffer.array[buffer.Nb-1].id);
+        globalTOF.index.array[i-1].blk = i;
         i++;
     }
-    file.index.size = Nblk;
-    closeTOF(&file);
+    globalTOF.index.size = Nblk;
+    closeTOF(&globalTOF);
+}
+
+
+void binary_search_index(bool *found,int *i,char key[6]){
+    *found=false;
+    int sup=globalTOF.index.size-1;
+    int inf=0;
+    if (strcmp(key,globalTOF.index.array[globalTOF.index.size-1].id)>0)
+    {
+        *i=globalTOF.index.array[globalTOF.index.size-1].blk;
+        *found=false;
+    } else {
+        while (sup>=inf && !(*found))
+        {
+            *i=(sup+inf)/2;
+            if (strcmp(key,globalTOF.index.array[*i].id)==0)
+            {
+                *found=true;
+            }else if(strcmp(key,globalTOF.index.array[*i].id)<0){
+                sup=(*i)-1;
+            }else{
+                inf=(*i)+1;
+            }
+        }
+        *i=globalTOF.index.array[*i].blk;
+        *found=true;
+    }
 }
 
 void loading_fact() {
@@ -1278,30 +1305,42 @@ void delete_given_recsTOVS()
 
 int main()
 {
-    FILE *statsTOF;
-    statsTOF = fopen("statsTOF.txt", "w");
-    fclose(statsTOF);
+    // FILE *statsTOF;
+    // statsTOF = fopen("statsTOF.txt", "w");
+    // fclose(statsTOF);
 
-    FILE *statsTOVS;
-    statsTOVS = fopen("statsTOVS.txt", "w");
-    fclose(statsTOVS);
+    // FILE *statsTOVS;
+    // statsTOVS = fopen("statsTOVS.txt", "w");
+    // fclose(statsTOVS);
     
-    createTOF("TOF.bin");
-    loading_TOF();
-    loading_fact();
-    frag_stat();
+    // createTOF("TOF.bin");
+    // loading_TOF();
+    // loading_fact();
+    // frag_stat();
 
-    createTOVS("TOVS.bin");
-    loading_TOVS();
-    TOVS tovs_f;
-    openTOVS(&tovs_f, "TOVS.bin", "rb+");
-    printf("number of blocks is :%d\n", getHeaderTOVS(&tovs_f, 1));
-    printf("number of records is :%d\n", getHeaderTOVS(&tovs_f, 2));
-    closeTOVS(&tovs_f);
+        //INDEX TESTING
+    loading_index_TOF();
+    for (int j = 0; j < globalTOF.index.size; j++)
+    {
+        printf("the %d id is : %s in block %d\n",j,globalTOF.index.array[j].id,globalTOF.index.array[j].blk);
+    }
+    int i;
+    bool found;
+    binary_search_index(&found,&i,"10153");
+    printf("found is : %d\n",found);
+    printf("the block is : %d\n",i);
 
-    delete_given_recsTOF();
-    loading_fact();
+    // createTOVS("TOVS.bin");
+    // loading_TOVS();
+    // TOVS tovs_f;
+    // openTOVS(&tovs_f, "TOVS.bin", "rb+");
+    // printf("number of blocks is :%d\n", getHeaderTOVS(&tovs_f, 1));
+    // printf("number of records is :%d\n", getHeaderTOVS(&tovs_f, 2));
+    // closeTOVS(&tovs_f);
 
-    delete_given_recsTOVS();
+    // delete_given_recsTOF();
+    // loading_fact();
+
+    // delete_given_recsTOVS();
     return 0;
 }

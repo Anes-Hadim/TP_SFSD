@@ -139,202 +139,12 @@ void createTOVS(char *filename)
 {
     TOVS file;
     openTOVS(&file, filename, "wb+");
-    setHeaderTOVS(&file, 1, 0);
+    setHeaderTOVS(&file, 1,1);
     setHeaderTOVS(&file, 2, 0);
     setHeaderTOVS(&file, 3, 0);
     setHeaderTOVS(&file, 4, 0);
     closeTOVS(&file);
 }
-
-void extract_string(TOVS *file, TOVSblock *buf, int *blk, int *pos, char *val, char *del)
-{
-    int k = 0;
-    do
-    {
-        val[k] = buf->array[*pos];
-        (*pos)++;
-        k++;
-        if (*pos >= B)
-        {
-            (*blk)++;
-            readBlockTOVS(file, *blk, buf);
-            *pos = 0;
-        }
-    } while (buf->array[*pos] != FieldSep);
-    val[k] = '\0';
-    (*pos)++;
-    if (*pos >= B)
-    {
-        (*blk)++;
-        readBlockTOVS(file, *blk, buf);
-        *pos = 0;
-    }
-    *del = buf->array[*pos];
-}
-
-void searchTOVS(char *filename, char *key, bool *found, int *blk, int *pos)
-{
-    *found = false;
-    *pos = 0;
-    *blk = 1;
-    int prevPos = 0;
-    int prevBlk = 1;
-    TOVS file;
-    openTOVS(&file, filename, "rb+");
-    TOVSblock buf;
-    if (getHeaderTOVS(&file,1)==0) {
-        *blk=1;
-        *pos=0;
-        *found=false;
-    } else {
-        char val[6];
-        char del;
-        bool stop = false;
-        readBlockTOVS(&file, *blk, &buf);
-        int count = 0;                                                 // number of records processed
-        int nbrec = getHeaderTOVS(&file, 2) + getHeaderTOVS(&file, 3); // total number of records (deleted and !deleted)
-        while (count <= nbrec && !(*found) && !stop)
-        {
-            if (count==nbrec) {
-                if (count != 0 && strcmp(val, key) > 0)
-                {
-                    *pos = prevPos;
-                    *blk = prevBlk;
-                }
-                stop=true;
-            } else if (count != 0 && strcmp(val, key) > 0)
-            {
-                stop = true;    // here pos is the new rec of the second biggest rec to key
-                *pos = prevPos; // so pos will point at the begining or the first largest res
-                *blk = prevBlk; // it is exactly where we should begin the insertion
-            }
-            else
-            {
-                prevPos = *pos;
-                prevBlk = *blk;
-                extract_string(&file, &buf, blk, pos, val, &del);
-                if (strcmp(val, key) == 0 && del == 'f')
-                {
-                    *found = true; // will stop pos at the del field
-                }
-                else
-                {
-                    do
-                    {
-                        (*pos)++;
-                        if (*pos >= B)
-                        {
-                            (*blk)++;
-                            readBlockTOVS(&file, *blk, &buf);
-                            *pos = 0;
-                        }
-                    } while (buf.array[*pos] != RecSep);
-                    (*pos)++;
-                    if (*pos >= B)
-                    {
-                        (*blk)++;
-                        readBlockTOVS(&file, *blk, &buf);
-                        *pos = 0;
-                    }
-                } // will stop pos at the first char of the new rec
-            }
-            count++; // because of count we will never need to test if we are in the last block and pos > NB
-        }
-    }
-    closeTOVS(&file);
-}
-
-void insertTOVS(char *filename, char rec[200])
-{
-    //rec will not be empty
-    bool found;
-    int blk, pos;
-    char key[6];
-    int i = 0;
-    do
-    {
-        key[i] = rec[i];
-        i++;
-    } while (rec[i] != FieldSep);
-    key[i] = '\0';
-    searchTOVS(filename, key, &found, &blk, &pos);
-    if (!found)
-    {
-        TOVS file;
-        TOVSblock buf;
-        openTOVS(&file, filename, "rb+");
-        char temp;
-        i = 0;
-        int endBlk = getHeaderTOVS(&file, 1);
-        int endPos = getHeaderTOVS(&file, 4);
-        if (endBlk==0) {
-            blk=1;
-            pos=0;
-            i=0;
-            while(rec[i]!='\0') {
-                buf.array[pos]=rec[i];
-                i++;
-                pos++;
-                if(pos==B) {
-                    pos=0;
-                    writeBlockTOVS(&file,blk,buf);
-                    blk++;
-                }
-            }
-            writeBlockTOVS(&file,blk,buf);
-            setHeaderTOVS(&file,1,blk);
-            setHeaderTOVS(&file, 2,1);
-            setHeaderTOVS(&file, 4, pos);
-        } else {
-            readBlockTOVS(&file, blk, &buf);
-            while (endBlk != blk || endPos != pos)
-            {
-                temp = buf.array[pos];
-                buf.array[pos] = rec[i];
-                rec[i] = temp;
-                i++;
-                pos++;
-                if (pos >= B)
-                {
-                    pos = 0;
-                    writeBlockTOVS(&file, blk, buf);
-                    blk++;
-                    readBlockTOVS(&file, blk, &buf);
-                }
-                if(rec[i]=='\0') {
-                    i=0;
-                }
-            }
-            int size=strlen(rec);
-            int count=0;
-            while (count<size)
-            {
-                buf.array[pos] = rec[i];
-                pos++;
-                i++;
-                if (i==size) {
-                    i=0;
-                }
-                if (pos >= B)
-                {
-                    pos = 0;
-                    writeBlockTOVS(&file, blk, buf);
-                    blk++;
-                }
-                count++;
-            }
-            writeBlockTOVS(&file,blk,buf);
-            setHeaderTOVS(&file,1,blk);
-            setHeaderTOVS(&file, 2, getHeaderTOVS(&file, 2) + 1);
-            setHeaderTOVS(&file, 4, pos);
-        }
-        closeTOVS(&file);
-    }else{
-        // printf("insertion failed for the id : %s already exit\n",key);
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void treat_str(char* str ,char* year) {
     int cpt=0;
@@ -379,18 +189,16 @@ void create_str(char* str,int blk,int pos) {
     str[j]=TuppleSep;
     j++;
     for(int i=0;i<strlen(nbpos);i++) {
-        str[j]=nblk[i];
+        str[j]=nbpos[i];
         j++;
     }
-    str[j]=FieldSep;
-    j++;
     str[j]='\0';
 }
 
 void insert_index(char* str) {
     TOVS index;
     TOVSblock buf;
-    openTOVS(&index,"indexYear.bin","wb+");
+    openTOVS(&index,"indexYear.bin","rb+");
     int j=getHeaderTOVS(&index,4);
     int i = getHeaderTOVS(&index,1);
     for(int k=0;k<strlen(str);k++) {
@@ -403,8 +211,10 @@ void insert_index(char* str) {
             j=0;
         }
     }
+    writeBlockTOVS(&index,i,buf);
     setHeaderTOVS(&index,1,i);
     setHeaderTOVS(&index,4,j);
+    closeTOVS(&index);
 }
 
 void loading_index_file() {
@@ -418,11 +228,11 @@ void loading_index_file() {
     int cpt=0;
     char str[150];
     char year[4];
-    char year1[3000]="1.0";
-    char year2[3000]="2.0";
-    char year3[3000]="3.0";
-    char year4[3000]="4.0";
-    char year5[3000]="5.0";
+    char year1[20000]="1.0";
+    char year2[20000]="2.0";
+    char year3[20000]="3.0";
+    char year4[20000]="4.0";
+    char year5[20000]="5.0";
     while(i<=getHeaderTOVS(&file,1)) {
         readBlockTOVS(&file,i,&buf1);
         int size = i==getHeaderTOVS(&file,1) ? getHeaderTOVS(&file,4) : B;
@@ -432,17 +242,14 @@ void loading_index_file() {
             if(cpt==0) {
                 pos=j;
                 blk=i;
-            }
-
-            if(buf1.array[j]==FieldSep) {
                 cpt=1;
             }
 
             if(buf1.array[j]!=RecSep) {
-                cpt=0;
                 str[k]=buf1.array[j];
                 k++;
             } else {
+                cpt=0;
                 str[k]='\0';
                 k=0;
                 treat_str(str,year);
@@ -463,7 +270,6 @@ void loading_index_file() {
         i++;
     }
     year1[strlen(year1)]=RecSep;
-    printf("%s\n",year1);
     year2[strlen(year2)]=RecSep;
     year3[strlen(year3)]=RecSep;
     year4[strlen(year4)]=RecSep;
@@ -481,13 +287,13 @@ void search(char *year){
     TOVS file;
     TOVS index;
     TOVSblock buf1;
+    TOVSblock buf2;
     openTOVS(&file,"TOVS.bin","rb");
     openTOVS(&index,"indexYear.bin","rb");
     int j=0;
     int cpt =0;
-    int i=0;
-    int bnb=1;
-    char yeartotest[4];
+    int i=1;
+    int bnb=0;
     if (strcmp(year,"1.0")==0)
     {
         cpt =1;
@@ -517,10 +323,84 @@ void search(char *year){
                 bnb++;
                 readBlockTOVS(&index,bnb,&buf1);
             }
-            
         }
-        
-        
+    }
+    int pos=0;
+    int blk=0;
+    int step = cpt==1 ? 4 : 5;
+    for (int k = 0; k <step; k++)
+    {
+        j++;
+        if (j>B)
+        {
+            j=0;
+            bnb++;
+            readBlockTOVS(&index,bnb,&buf1);
+        }
+    }
+    while (buf1.array[j]!=RecSep)
+    {
+        char blk_str[6];
+        char pos_str[6];
+        int k=0;
+        while (buf1.array[j]!=TuppleSep)
+        {
+            blk_str[k]=buf1.array[j];
+            k++;
+            j++;
+            if (j>B)
+            {
+                j=0;
+                bnb++;
+                readBlockTOVS(&index,bnb,&buf1);
+            }
+        }
+        blk_str[k]='\0';
+        k=0; 
+        j++;
+        if (j>B)
+        {
+            j=0;
+            bnb++;
+            readBlockTOVS(&index,bnb,&buf1);
+        }
+        while (buf1.array[j]!=FieldSep && buf1.array[j]!=RecSep)
+        {
+            pos_str[k]=buf1.array[j];
+            k++;
+            j++;
+            if (j>B)
+            {
+                j=0;
+                bnb++;
+                readBlockTOVS(&index,bnb,&buf1);
+            }
+        }
+        if (buf1.array[j]!=RecSep) {
+            j++;
+            if (j>B)
+            {
+                j=0;
+                bnb++;
+                readBlockTOVS(&index,bnb,&buf1);
+            }
+        }
+        pos_str[k]='\0';
+        blk=atoi(blk_str);
+        pos=atoi(pos_str);
+        readBlockTOVS(&file,blk,&buf2);
+        while (buf2.array[pos]!=RecSep)
+        {
+            printf("%c",buf2.array[pos]);
+            pos++;
+            if (pos>B)
+            {
+                pos=0;
+                blk++;
+                readBlockTOVS(&file,blk,&buf2);
+            }
+        }
+        printf("\n\n\n");
     }
     
     
@@ -531,5 +411,26 @@ void search(char *year){
 int main() {
     createTOVS("indexYear.bin");
     loading_index_file();
+
+
+    // TOVS index;
+    // openTOVS(&index,"indexYear.bin","rb");
+    // TOVSblock buf;
+    // for(int i=1;i<=getHeaderTOVS(&index,1);i++) {
+    //     readBlockTOVS(&index,i,&buf);
+    //     int size = i==getHeaderTOVS(&index,1) ? getHeaderTOVS(&index,4) : B;
+    //     for(int j=0;j<size;j++) {
+    //         if (buf.array[j]==RecSep) {
+    //             printf("%c\n\n\n\n",buf.array[j]);
+    //         } else {
+    //             printf("%c",buf.array[j]);
+    //         }
+    //     }
+    // }
+    // closeTOVS(&index);
+
+
+    search("1.0");
+
     return 0;
 }

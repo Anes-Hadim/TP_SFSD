@@ -220,6 +220,8 @@ void binary_search_index(bool *found,int *i,char key[6]) { //binary search funct
 int writenum=0;
 int readnum=0;
 int fragmentation=0;
+double frag_rate=0;
+double avr_fact=0;
 
 // missing_values //
 
@@ -563,7 +565,7 @@ void loading_fact() {
     openTOF(&file, "TOF.bin", "r");
     int Nblk = getHeaderTOF(&file, 1);
     int nbrec = getHeaderTOF(&file, 2);
-    double avr_fact = (double) nbrec / (Nblk*MAX) ;
+    avr_fact = (double) nbrec / (Nblk*MAX) ;
     printf("average loading factor is %0.3lf\n",avr_fact);
     closeTOF(&file);
 }
@@ -573,9 +575,10 @@ void frag_stat() {
     openTOF(&file, "TOF.bin", "r");
     int nrec = getHeaderTOF(&file, 2);
     printf("the TOF file has %d records each one with a capcity of %zu bytes\n",nrec,sizeof(rec));
-    printf("the alocated space for records is %zu bytes (without conting the remaining space inside each block)\n",nrec*sizeof(rec));
+    printf("the alocated space for records is %zu bytes (without counting the remainding space inside each block)\n",nrec*sizeof(rec));
     printf("the unused space inside the records is %d bytes\n",fragmentation);
-    printf("the fragmentation rate is %0.3lf\n",(double)fragmentation/(nrec*sizeof(rec)));
-
+    frag_rate = (double)fragmentation/(nrec*sizeof(rec));
+    printf("the fragmentation rate is %0.3lf\n",frag_rate);
+    
     closeTOF(&file);
 }

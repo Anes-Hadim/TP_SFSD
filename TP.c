@@ -1,152 +1,8 @@
-#include <stdbool.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include"TOVS.h"
 
-#define B 1000
-#define RecSep '#'
-#define FieldSep '@'
 #define TuppleSep '?'
 
-typedef struct TOVSblock
-{
-    char array[B];
-} TOVSblock;
-
-typedef struct TOVSHeader
-{
-    int BlkNb;
-    int RecNb;    // total undeleted records in the file
-    int DelRecNb; // total deleted records in the file
-    int pos;      // NB is max for all the block exept the last one which will be same as pos
-} TOVSHeader;
-
-typedef struct TOVS
-{
-    TOVSHeader header;
-    FILE *f;
-} TOVS;
-
-TOVS globalTOVS;
-
-void openTOVS(TOVS *file, char *filename, char *mode);
-
-void closeTOVS(TOVS *file);
-
-void setHeaderTOVS(TOVS *file, int field, int val);
-
-int getHeaderTOVS(TOVS *file, int field);
-
-void readBlockTOVS(TOVS *file, int Bnb, TOVSblock *buffer);
-
-void writeBlockTOVS(TOVS *file, int Bnb, TOVSblock buffer);
-
-void openTOVS(TOVS *file, char *filename, char *mode)
-{
-    file->f = fopen(filename, mode);
-    if (file->f == NULL)
-    {
-        perror("error openning the file");
-        exit(1);
-    }
-    int n = fread(&(file->header), sizeof(TOVSHeader), 1, file->f);
-    if (n != 1)
-    {
-        setHeaderTOVS(file, 1, 0);
-        setHeaderTOVS(file, 2, 0);
-        setHeaderTOVS(file, 3, 0);
-        setHeaderTOVS(file, 4, 0);
-    }
-}
-
-void closeTOVS(TOVS *file)
-{
-    fseek(file->f, 0, SEEK_SET);
-    fwrite(&(file->header), sizeof(TOVSHeader), 1, file->f);
-    fclose(file->f);
-}
-
-void setHeaderTOVS(TOVS *file, int field, int val)
-{
-    if (file->f != NULL)
-    {
-        switch (field)
-        {
-        case 1:
-            file->header.BlkNb = val;
-            break;
-        case 2:
-            file->header.RecNb = val;
-            break;
-        case 3:
-            file->header.DelRecNb = val;
-            break;
-        case 4:
-            file->header.pos = val;
-            break;
-
-        default:
-            printf("Error field does not exist\n");
-            break;
-        }
-    }
-}
-
-int getHeaderTOVS(TOVS *file, int field)
-{
-    if (file->f != NULL)
-    {
-        switch (field)
-        {
-        case 1:
-            return file->header.BlkNb;
-            break;
-        case 2:
-            return file->header.RecNb;
-            break;
-        case 3:
-            return file->header.DelRecNb;
-            break;
-        case 4:
-            return file->header.pos;
-            break;
-
-        default:
-            printf("Error field does not exist\n");
-            return -1;
-            break;
-        }
-    }
-    return -1;
-}
-
-void readBlockTOVS(TOVS *file, int Bnb, TOVSblock *buffer)
-{
-    if (Bnb <= getHeaderTOVS(file, 1))
-    {
-        fseek(file->f, (Bnb - 1) * sizeof(TOVSblock) + sizeof(TOVSHeader), SEEK_SET);
-        fread(buffer, sizeof(TOVSblock), 1, file->f);
-    }
-}
-
-void writeBlockTOVS(TOVS *file, int Bnb, TOVSblock buffer)
-{
-    fseek(file->f, (Bnb - 1) * sizeof(TOVSblock) + sizeof(TOVSHeader), SEEK_SET);
-    fwrite(&buffer, sizeof(TOVSblock), 1, file->f);
-}
-
-void createTOVS(char *filename)
-{
-    TOVS file;
-    openTOVS(&file, filename, "wb+");
-    setHeaderTOVS(&file, 1,1);
-    setHeaderTOVS(&file, 2, 0);
-    setHeaderTOVS(&file, 3, 0);
-    setHeaderTOVS(&file, 4, 0);
-    closeTOVS(&file);
-}
-
-void treat_str(char* str ,char* year) {
+void treat_str(char* str ,char* year) { //extract the year from the given record (string)
     int cpt=0;
     int i=0;
     char del;
@@ -172,7 +28,7 @@ void treat_str(char* str ,char* year) {
     }
 }
 
-void create_str(char* str,int blk,int pos) {
+void create_str(char* str,int blk,int pos) { //creating the years's string by appending the found block and position
     int j=strlen(str);
     char nblk[10];
     char nbpos[10];
@@ -195,12 +51,13 @@ void create_str(char* str,int blk,int pos) {
     str[j]='\0';
 }
 
-void insert_index(char* str) {
+void insert_index(char* str) { //insert a year's string inside the index file
     TOVS index;
     TOVSblock buf;
     openTOVS(&index,"indexYear.bin","rb+");
     int j=getHeaderTOVS(&index,4);
     int i = getHeaderTOVS(&index,1);
+    i = i==0 ? 1 : i; //in case of an empty file
     for(int k=0;k<strlen(str);k++) {
         if(j<B) {
             buf.array[j]=str[k];
@@ -217,7 +74,7 @@ void insert_index(char* str) {
     closeTOVS(&index);
 }
 
-void loading_index_file() {
+void loading_index_file() { //creates the index file based on the TOVS file
     TOVS file;
     openTOVS(&file,"TOVS.bin","rb");
     TOVSblock buf1;
@@ -283,7 +140,7 @@ void loading_index_file() {
     closeTOVS(&file);
 }
 
-void search(char *year){
+void search(char *year){ //gets all the info of all the students in a specific year
     TOVS file;
     TOVS index;
     TOVSblock buf1;
@@ -391,7 +248,12 @@ void search(char *year){
         readBlockTOVS(&file,blk,&buf2);
         while (buf2.array[pos]!=RecSep)
         {
-            printf("%c",buf2.array[pos]);
+            if (buf2.array[pos]==FieldSep)
+            {
+                printf(" ");
+            }else{
+                printf("%c",buf2.array[pos]);
+            }
             pos++;
             if (pos>B)
             {
@@ -409,6 +271,7 @@ void search(char *year){
 }
 
 int main() {
+
     createTOVS("indexYear.bin");
     loading_index_file();
 
@@ -430,7 +293,7 @@ int main() {
     // closeTOVS(&index);
 
 
-    search("1.0");
+    search("2.0");
 
     return 0;
 }
